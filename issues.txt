@@ -1,0 +1,6 @@
+time scaling
+dashboard: html -> react (partial)
+timestamp -> step / seconds ?
+sqlite -> timeseries db
+docs
+twin

@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2025-08-06 11:54:38 by Eclipse SUMO netedit Version 1.22.0
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <!-- VTypes -->
+    <vType id="301" length="4.68" width="1.8" height="1.47" color="0,0,128"/>
+    <vType id="302" length="4.68" width="1.9" height="1.47" color="132,132,132"/>
+    <vType id="303" length="4.06" width="0.93" vClass="bicycle" color="66,66,66"/>
+    <vType id="304" length="4.07" width="1.43" color="228,58,58"/>
+    <vType id="305" length="4.81" guiShape="passenger" width="1.84" color="245,215,50"/>
+    <vType id="306" length="4.81" width="1.6" color="229,229,229"/>
+    <vType id="EgoBike" length="1.80" vClass="bicycle" color="16,186,16"/>
+    <vType id="EgoCar" length="4.81" width="2.16" color="69,56,56"/>
+    <vType id="EgoScooter" length="1.09" vClass="scooter"/>
+    <vTypeDistribution id="typedist1" vTypes="302 303" probabilities="0.4 0.8"/>
+    <flow id="f_1" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E100" to="E93"/>
+    <flow id="f_2" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E101" to="-E85"/>
+    <flow id="f_3" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E102" to="-E75"/>
+    <flow id="f_4" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E103" to="-E82"/>
+    <flow id="f_5" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E104" to="E118"/>
+    <flow id="f_6" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E105" to="-E69"/>
+    <flow id="f_7" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E106" to="-E69"/>
+    <flow id="f_8" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E107" to="-E107.27"/>
+    <flow id="f_9" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E107.27" to="-E79"/>
+    <flow id="f_10" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E109" to="-E83"/>
+    <flow id="f_11" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E110" to="E107"/>
+    <flow id="f_12" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E111" to="E106"/>
+    <flow id="f_13" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E112" to="E42"/>
+    <flow id="f_14" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E113" to="E90"/>
+    <flow id="f_15" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E115" to="E129"/>
+    <flow id="f_16" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E116" to="-E87"/>
+    <flow id="f_17" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E117" to="-E96"/>
+    <flow id="f_18" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E118" to="E109"/>
+    <flow id="f_19" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E119" to="-E131"/>
+    <flow id="f_20" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E120" to="-E103"/>
+    <flow id="f_21" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E121" to="E102"/>
+    <flow id="f_22" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E122" to="-E73"/>
+    <flow id="f_23" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E123" to="E67.27"/>
+    <flow id="f_24" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E124" to="E131"/>
+    <flow id="f_25" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E126" to="-E107"/>
+    <flow id="f_26" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E127" to="E117"/>
+    <flow id="f_27" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E128" to="-E151"/>
+    <flow id="f_28" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E129" to="E136"/>
+    <flow id="f_29" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E129.53" to="E115"/>
+    <flow id="f_30" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E131" to="-E127"/>
+    <flow id="f_31" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E132" to="E138"/>
+    <flow id="f_32" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E133" to="E105"/>
+    <flow id="f_33" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E134" to="-E77"/>
+    <flow id="f_34" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E135" to="E70"/>
+    <flow id="f_35" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E136" to="-E102"/>
+    <flow id="f_36" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E137" to="E41"/>
+    <flow id="f_37" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E138" to="-E107.27"/>
+    <flow id="f_38" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E139" to="E39"/>
+    <flow id="f_39" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E140" to="-E94"/>
+    <flow id="f_40" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E141" to="E99"/>
+    <flow id="f_41" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E142" to="E135"/>
+    <flow id="f_42" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E143" to="E126"/>
+    <flow id="f_43" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E144" to="E126"/>
+    <flow id="f_44" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E145" to="-E71"/>
+    <flow id="f_45" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E146" to="E143"/>
+    <flow id="f_46" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E147" to="-E74"/>
+    <flow id="f_47" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E148" to="E94"/>
+    <flow id="f_48" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E149" to="E113"/>
+    <flow id="f_49" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E150" to="E111"/>
+    <flow id="f_50" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E151" to="-E75"/>
+    <flow id="f_51" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E152" to="E151"/>
+    <flow id="f_52" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E153" to="E147"/>
+    <flow id="f_53" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E66" to="-E82"/>
+    <flow id="f_54" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E67" to="-E129.53"/>
+    <flow id="f_55" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E68" to="E67"/>
+    <flow id="f_56" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E69" to="-E93"/>
+    <flow id="f_57" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E70" to="-E124"/>
+    <flow id="f_58" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E71" to="E121"/>
+    <flow id="f_59" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E72" to="-E88"/>
+    <flow id="f_60" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E73" to="E124"/>
+    <flow id="f_61" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E74" to="-E107.27"/>
+    <flow id="f_62" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E75" to="E73"/>
+    <flow id="f_63" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E76" to="E120"/>
+    <flow id="f_64" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E77" to="E93"/>
+    <flow id="f_65" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E78" to="E147"/>
+    <flow id="f_66" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E79" to="-E83"/>
+    <flow id="f_67" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E81" to="-E80"/>
+    <flow id="f_68" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E82" to="E96"/>
+    <flow id="f_69" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E83" to="-E68"/>
+    <flow id="f_70" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E84" to="E70"/>
+    <flow id="f_71" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E85" to="E116"/>
+    <flow id="f_72" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E86" to="E41"/>
+    <flow id="f_73" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E87" to="E154"/>
+    <flow id="f_74" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E88" to="-E152"/>
+    <flow id="f_75" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E89" to="-E150"/>
+    <flow id="f_76" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E90" to="E88"/>
+    <flow id="f_77" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E91" to="E71"/>
+    <flow id="f_78" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E92" to="-E134"/>
+    <flow id="f_79" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E93" to="-E97"/>
+    <flow id="f_80" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E94" to="-E84"/>
+    <flow id="f_81" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E95" to="E69"/>
+    <flow id="f_82" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E96" to="E116"/>
+    <flow id="f_83" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E97" to="E115"/>
+    <flow id="f_84" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E98" to="-E132"/>
+    <flow id="f_85" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="-E99" to="E67"/>
+    <flow id="f_86" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E100" to="E145"/>
+    <flow id="f_87" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E101" to="E122"/>
+    <flow id="f_88" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E102" to="-E151"/>
+    <flow id="f_89" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E103" to="-E75"/>
+    <flow id="f_90" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E104" to="-E134"/>
+    <flow id="f_91" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E105" to="E106"/>
+    <flow id="f_92" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E107" to="E120"/>
+    <flow id="f_93" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E108" to="-E88"/>
+    <flow id="f_94" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E109" to="E137"/>
+    <flow id="f_95" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E110" to="-E131"/>
+    <flow id="f_96" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E111" to="E70"/>
+    <flow id="f_97" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E112" to="E68"/>
+    <flow id="f_98" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E113" to="-E133"/>
+    <flow id="f_99" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E114" to="E123"/>
+    <flow id="f_100" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E116" to="-E107.27"/>
+    <flow id="f_101" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E117" to="E137"/>
+    <flow id="f_102" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E118" to="-E132"/>
+    <flow id="f_103" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E119" to="-E92"/>
+    <flow id="f_104" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E120" to="E122"/>
+    <flow id="f_105" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E121" to="E76"/>
+    <flow id="f_106" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E122" to="-E101"/>
+    <flow id="f_107" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E123" to="-E107"/>
+    <flow id="f_108" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E124" to="-E117"/>
+    <flow id="f_109" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E126" to="E66"/>
+    <flow id="f_110" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E127" to="E87"/>
+    <flow id="f_111" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E128" to="E78"/>
+    <flow id="f_112" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E129" to="E131"/>
+    <flow id="f_113" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E131" to="E137"/>
+    <flow id="f_114" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E132" to="-E150"/>
+    <flow id="f_115" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E133" to="-E122"/>
+    <flow id="f_116" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E134" to="-E96"/>
+    <flow id="f_117" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E140" to="E78"/>
+    <flow id="f_118" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E141" to="-E97"/>
+    <flow id="f_119" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E150" to="-E92"/>
+    <flow id="f_120" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E151" to="-E68"/>
+    <flow id="f_121" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E152" to="-E71"/>
+    <flow id="f_122" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E66" to="E76"/>
+    <flow id="f_123" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E67" to="E104"/>
+    <flow id="f_124" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E67.27" to="E70"/>
+    <flow id="f_125" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E68" to="E93"/>
+    <flow id="f_126" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E69" to="-E66"/>
+    <flow id="f_127" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E71" to="E133"/>
+    <flow id="f_128" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E72" to="E127"/>
+    <flow id="f_129" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E73" to="E133"/>
+    <flow id="f_130" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E74" to="E71"/>
+    <flow id="f_131" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E75" to="E72"/>
+    <flow id="f_132" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E76" to="-E103"/>
+    <flow id="f_133" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E77" to="E124"/>
+    <flow id="f_134" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E78" to="-E104"/>
+    <flow id="f_135" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E79" to="-E116"/>
+    <flow id="f_136" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E80" to="E81"/>
+    <flow id="f_137" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E82" to="-E117"/>
+    <flow id="f_138" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E83" to="E133"/>
+    <flow id="f_139" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E84" to="-E129.53"/>
+    <flow id="f_140" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E85" to="-E73"/>
+    <flow id="f_141" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E86" to="E74"/>
+    <flow id="f_142" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E87" to="-E73"/>
+    <flow id="f_143" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E88" to="-E118"/>
+    <flow id="f_144" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E89" to="E150"/>
+    <flow id="f_145" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E90" to="E107"/>
+    <flow id="f_146" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E91" to="E143"/>
+    <flow id="f_147" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E92" to="E78"/>
+    <flow id="f_148" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E93" to="E67.27"/>
+    <flow id="f_149" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E94" to="-E93"/>
+    <flow id="f_150" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E95" to="E80"/>
+    <flow id="f_151" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E96" to="E115"/>
+    <flow id="f_152" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E97" to="-E152"/>
+    <flow id="f_153" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E98" to="E137"/>
+    <flow id="f_154" type="typedist1" begin="0" end="3600" period="exp(0.006)" from="E99" to="-E90"/>
+    <flow id="f_155" type="typedist1" begin="0" end="3600" period="exp(0.01)" from="-E36" to="-E87"/>
+    <flow id="f_156" type="typedist1" begin="0" end="3600" period="exp(0.01)" from="-E39" to="-E69"/>
+    <flow id="f_157" type="typedist1" begin="0" end="3600" period="exp(0.01)" from="-E41" to="-E71"/>
+    <flow id="f_158" type="typedist1" begin="0" end="3600" period="exp(0.01)" from="-E42" to="-E129.53"/>
+    <flow id="f_159" type="typedist1" begin="0" end="3600" period="exp(0.01)" from="-E43" to="E144"/>
+    <trip id="f_0.0" type="EgoCar" depart="540" from="-E107" to="E120"/>
+</routes>

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>Traffic Monitor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #fff; color: #111; font: 13px/1.5 system-ui, sans-serif; }
+
+  #bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid #e5e5e5; flex-wrap: wrap; }
+  #bar h1 { font-size: 13px; font-weight: 500; flex: 1; min-width: 120px; }
+  #bar select { border: 1px solid #ddd; padding: 3px 7px; font: inherit; background: #fff; cursor: pointer; }
+  .ind { font-size: 11px; color: #999; display: flex; align-items: center; gap: 5px; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: #ddd; flex-shrink: 0; }
+  .dot.on  { background: #22c55e; }
+  .dot.err { background: #f97316; }
+
+  #stats { display: flex; border-bottom: 1px solid #e5e5e5; }
+  .s { flex: 1; padding: 12px 16px; border-right: 1px solid #e5e5e5; }
+  .s:last-child { border-right: none; }
+  .s-l { font-size: 11px; color: #999; margin-bottom: 2px; }
+  .s-v { font-size: 22px; font-weight: 300; }
+
+  #grid { display: flex; flex-direction: column; gap: 1px; background: #e5e5e5; }
+  .card { background: #fff; padding: 16px 20px; }
+
+  .ch { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+  .cid { font-size: 13px; font-weight: 500; }
+  .cmeta { font-size: 11px; color: #999; }
+
+  .nums { display: flex; gap: 28px; padding: 8px 0; border-top: 1px solid #f0f0f0; border-bottom: 1px solid #f0f0f0; margin-bottom: 14px; }
+  .n-l { font-size: 10px; color: #999; margin-bottom: 1px; }
+  .n-v { font-size: 20px; font-weight: 300; }
+
+  /* Each chart gets its own full-width row */
+  .chart-block { margin-bottom: 14px; }
+  .chart-block:last-of-type { margin-bottom: 0; }
+  .ct-l { font-size: 10px; color: #999; margin-bottom: 4px; }
+  .chart-wrap { position: relative; height: 110px; width: 100%; }
+
+  /* Legend for moving average */
+  .legend { display: flex; gap: 14px; margin-bottom: 4px; }
+  .leg-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #999; }
+  .leg-swatch { width: 20px; height: 2px; }
+  .leg-swatch.ma { border-top: 2px dashed #111; }
+
+  .ticks { display: flex; gap: 1px; height: 3px; margin-top: 12px; }
+  .ticks span { flex: 1; background: #f0f0f0; }
+  .ticks span.t { background: #f97316; }
+
+  #empty { display: none; padding: 60px; text-align: center; color: #bbb; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div id="bar">
+  <h1>Traffic Monitor</h1>
+  <select id="sel-jid"><option value="all">All junctions</option></select>
+  <select id="sel-range">
+    <option value="5">5 min</option>
+    <option value="15" selected>15 min</option>
+    <option value="60">1 h</option>
+  </select>
+  <div class="ind"><div class="dot" id="d-ws"></div>WS</div>
+  <div class="ind"><div class="dot" id="d-api"></div>API</div>
+  <div class="ind" id="ts">—</div>
+</div>
+
+<div id="stats">
+  <div class="s"><div class="s-l">Junctions</div><div class="s-v" id="sv-j">—</div></div>
+  <div class="s"><div class="s-l">Total queue</div><div class="s-v" id="sv-q">—</div></div>
+  <div class="s"><div class="s-l">Avg wait</div><div class="s-v" id="sv-w">—</div></div>
+  <div class="s"><div class="s-l">Cmds issued</div><div class="s-v" id="sv-c">—</div></div>
+</div>
+
+<div id="grid"></div>
+<div id="empty">Waiting for data — is the system running?</div>
+
+<script>
+const API    = 'http://localhost:5050/api';
+const WS_URL = 'ws://localhost:5050/ws';
+const MA_WIN = 10;   // moving average window (samples)
+
+let charts    = {};
+let filterJid = 'all';
+
+// ── Moving average helper ─────────────────────────────────────
+function movingAvg(data, win) {
+  return data.map((_, i) => {
+    const slice = data.slice(Math.max(0, i - win + 1), i + 1);
+    return +(slice.reduce((a, b) => a + b, 0) / slice.length).toFixed(2);
+  });
+}
+
+// ── Chart factories ───────────────────────────────────────────
+function mkSimple(ctx, color, fill, unit) {
+  return new Chart(ctx, {
+    type: 'line',
+    data: { labels: [], datasets: [{
+      data: [], borderColor: color, backgroundColor: fill,
+      borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.3,
+    }]},
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          ticks: {
+            color: '#bbb', font: { size: 9 },
+            maxTicksLimit: 6, maxRotation: 0,
+          },
+          grid: { color: '#f5f5f5' },
+        },
+        y: {
+          min: 0,
+          title: { display: true, text: unit, color: '#bbb', font: { size: 9 } },
+          grid: { color: '#f5f5f5' },
+          ticks: { color: '#bbb', font: { size: 9 }, maxTicksLimit: 4 },
+        }
+      }
+    }
+  });
+}
+
+function mkWait(ctx) {
+  return new Chart(ctx, {
+    type: 'line',
+    data: { labels: [], datasets: [
+      {
+        label: 'Avg wait',
+        data: [], borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,.06)',
+        borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.3,
+      },
+      {
+        label: `MA(${MA_WIN})`,
+        data: [], borderColor: '#111', backgroundColor: 'transparent',
+        borderWidth: 1.5, borderDash: [4, 3], pointRadius: 0, fill: false, tension: 0.3,
+      }
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          ticks: { color: '#bbb', font: { size: 9 }, maxTicksLimit: 6, maxRotation: 0 },
+          grid: { color: '#f5f5f5' },
+        },
+        y: {
+          min: 0,
+          title: { display: true, text: 'seconds', color: '#bbb', font: { size: 9 } },
+          grid: { color: '#f5f5f5' },
+          ticks: { color: '#bbb', font: { size: 9 }, maxTicksLimit: 4 },
+        }
+      }
+    }
+  });
+}
+
+// ── Card builder ──────────────────────────────────────────────
+function buildCard(jid) {
+  const d = document.createElement('div');
+  d.className = 'card'; d.id = `c-${jid}`;
+  d.innerHTML = `
+    <div class="ch">
+      <span class="cid">${jid}</span>
+      <span class="cmeta" id="m-${jid}">—</span>
+    </div>
+    <div class="nums">
+      <div><div class="n-l">Queue</div><div class="n-v" style="color:#3b82f6" id="nq-${jid}">—</div></div>
+      <div><div class="n-l">Avg wait</div><div class="n-v" style="color:#f97316" id="nw-${jid}">—</div></div>
+      <div><div class="n-l">Phase</div><div class="n-v" id="np-${jid}">—</div></div>
+      <div><div class="n-l">Duration</div><div class="n-v" id="nd-${jid}">—</div></div>
+    </div>
+
+    <div class="chart-block">
+      <div class="ct-l">Queue (vehicles)</div>
+      <div class="chart-wrap"><canvas id="cq-${jid}"></canvas></div>
+    </div>
+
+    <div class="chart-block">
+      <div class="ct-l">Wait time</div>
+      <div class="legend">
+        <div class="leg-item"><div class="leg-swatch" style="background:#f97316"></div>avg wait</div>
+        <div class="leg-item"><div class="leg-swatch ma"></div>MA(${MA_WIN})</div>
+      </div>
+      <div class="chart-wrap"><canvas id="cw-${jid}"></canvas></div>
+    </div>
+
+    <div class="chart-block">
+      <div class="ct-l">Phase index</div>
+      <div class="chart-wrap"><canvas id="cp-${jid}"></canvas></div>
+    </div>
+
+    <div class="ticks" id="tk-${jid}"></div>
+  `;
+  document.getElementById('grid').appendChild(d);
+  charts[jid] = {
+    q: mkSimple(document.getElementById(`cq-${jid}`), '#3b82f6', 'rgba(59,130,246,.06)', 'vehicles'),
+    w: mkWait(document.getElementById(`cw-${jid}`)),
+    p: mkSimple(document.getElementById(`cp-${jid}`), '#aaa', 'rgba(170,170,170,.05)', 'index'),
+  };
+}
+
+function setSimple(ch, labels, data) {
+  ch.data.labels = labels;
+  ch.data.datasets[0].data = data;
+  ch.update('none');
+}
+
+function setWait(ch, labels, data) {
+  ch.data.labels = labels;
+  ch.data.datasets[0].data = data;
+  ch.data.datasets[1].data = movingAvg(data, MA_WIN);
+  ch.update('none');
+}
+
+function setDot(id, cls) { document.getElementById(`d-${id}`).className = 'dot ' + (cls||''); }
+
+// ── Junction filter ───────────────────────────────────────────
+function syncSelector(jids) {
+  const sel = document.getElementById('sel-jid');
+  const have = [...sel.options].map(o => o.value);
+  jids.forEach(jid => {
+    if (!have.includes(jid)) {
+      const o = document.createElement('option');
+      o.value = o.textContent = jid;
+      sel.appendChild(o);
+    }
+  });
+}
+
+function applyFilter() {
+  [...document.getElementById('grid').children].forEach(card => {
+    const jid = card.id.replace('c-', '');
+    card.style.display = (filterJid === 'all' || filterJid === jid) ? '' : 'none';
+  });
+}
+
+// ── WebSocket live updates ────────────────────────────────────
+function connectWS() {
+  const ws = new WebSocket(WS_URL);
+  ws.onopen  = () => setDot('ws', 'on');
+  ws.onclose = () => { setDot('ws', 'err'); setTimeout(connectWS, 3000); };
+  ws.onmessage = ({ data }) => {
+    try {
+      const msg   = JSON.parse(data);
+      const parts = (msg._topic||'').split('/');
+      const jid = parts[1], kind = parts[2];
+      if (!jid || !charts[jid]) return;
+      if (kind === 'state') {
+        const q  = (msg.queues||[]).reduce((a,b) => a+b, 0);
+        const wt = msg.waiting_times||[];
+        const w  = wt.length ? (wt.reduce((a,b) => a+b, 0) / wt.length).toFixed(1) : '0.0';
+        document.getElementById(`nq-${jid}`).textContent = q;
+        document.getElementById(`nw-${jid}`).textContent = w + 's';
+        document.getElementById(`np-${jid}`).textContent = 'p' + (msg.current_phase ?? '—');
+        document.getElementById(`nd-${jid}`).textContent = (msg.phase_duration ?? '—') + 's';
+        document.getElementById(`m-${jid}`).textContent  = new Date().toLocaleTimeString();
+      }
+      if (kind === 'cmd') {
+        const tk = document.getElementById(`tk-${jid}`);
+        const sp = document.createElement('span'); sp.className = 't';
+        tk.prepend(sp);
+        while (tk.children.length > 80) tk.lastChild.remove();
+      }
+    } catch {}
+  };
+}
+
+// ── Historical poll ───────────────────────────────────────────
+async function poll() {
+  const min = document.getElementById('sel-range').value;
+  try {
+    const jids = await fetch(`${API}/junctions`).then(r => r.json());
+    if (!jids.length) {
+      document.getElementById('empty').style.display = 'block';
+      document.getElementById('grid').style.display  = 'none';
+      setDot('api'); return;
+    }
+    document.getElementById('empty').style.display = 'none';
+    document.getElementById('grid').style.display  = 'flex';
+    setDot('api', 'on');
+
+    syncSelector(jids);
+    jids.forEach(jid => { if (!charts[jid]) buildCard(jid); });
+
+    const [states, cmds] = await Promise.all([
+      Promise.all(jids.map(j => fetch(`${API}/state/${j}?minutes=${min}`).then(r => r.json()))),
+      Promise.all(jids.map(j => fetch(`${API}/cmds/${j}?minutes=${min}`).then(r => r.json()))),
+    ]);
+
+    let tq = 0, tw = 0, tc = 0;
+    jids.forEach((jid, i) => {
+      const rows = states[i];
+      // Show time with unit label every Nth tick naturally via Chart.js
+      const lbls = rows.map(r => new Date(r.ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      setSimple(charts[jid].q, lbls, rows.map(r => r.total_queue));
+      setWait(charts[jid].w,   lbls, rows.map(r => +r.avg_wait.toFixed(2)));
+      setSimple(charts[jid].p, lbls, rows.map(r => r.current_phase));
+      tq += rows.at(-1)?.total_queue ?? 0;
+      tw += rows.at(-1)?.avg_wait    ?? 0;
+      tc += cmds[i].length;
+    });
+
+    document.getElementById('sv-j').textContent = jids.length;
+    document.getElementById('sv-q').textContent = tq;
+    document.getElementById('sv-w').textContent = jids.length ? (tw / jids.length).toFixed(1) + 's' : '—';
+    document.getElementById('sv-c').textContent = tc;
+    document.getElementById('ts').textContent   = new Date().toLocaleTimeString();
+    applyFilter();
+
+  } catch { setDot('api', 'err'); }
+}
+
+document.getElementById('sel-jid').addEventListener('change', e => { filterJid = e.target.value; applyFilter(); });
+document.getElementById('sel-range').addEventListener('change', poll);
+connectWS();
+poll();
+setInterval(poll, 10000);
+</script>
+</body>
+</html>
