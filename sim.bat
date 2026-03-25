@@ -34,7 +34,9 @@ start "SUMO Gateway" cmd /k "%PYTHON% sumo_gateway.py --cfg %SUMO_CFG% --net %SU
 timeout /t 2 /nobreak >nul
 
 :: Open dashboard in default browser
-start "" dashboard.html
+start "Dashboard" cmd /k "cd /d traffic-dashboard && npm run dev"
+timeout /t 3 /nobreak >nul
+start "" http://localhost:3000
 
 echo  All services started.
 echo  Dashboard opened in browser.

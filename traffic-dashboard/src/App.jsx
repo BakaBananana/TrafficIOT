@@ -65,7 +65,7 @@ function StatBar({ junctions, totalQueue, avgWait, cmds }) {
     { label: 'Junctions',   value: junctions ?? '—' },
     { label: 'Total queue', value: totalQueue ?? '—' },
     { label: 'Avg wait',    value: avgWait != null ? avgWait + 's' : '—' },
-    { label: 'Cmds issued', value: cmds ?? '—' },
+    { label: 'Switches',    value: cmds ?? '—' },
   ]
   return (
     <div style={{ display: 'flex', borderBottom: '1px solid #e5e5e5' }}>
@@ -84,14 +84,11 @@ function StatBar({ junctions, totalQueue, avgWait, cmds }) {
 
 function LiveNums({ live }) {
   if (!live) return null
-  const q  = (live.queues || []).reduce((a, b) => a + b, 0)
-  const wt = live.waiting_times || []
-  const w  = wt.length ? (wt.reduce((a, b) => a + b, 0) / wt.length).toFixed(1) : '0.0'
   const items = [
-    { label: 'Queue',    value: q,                          color: '#3b82f6' },
-    { label: 'Avg wait', value: w + 's',                    color: '#f97316' },
-    { label: 'Phase',    value: 'p' + (live.current_phase ?? '—'), color: '#111' },
-    { label: 'Duration', value: (live.phase_duration ?? '—') + 's', color: '#111' },
+    { label: 'PCU queue', value: live.pcu_queue ?? '—',                    color: '#3b82f6' },
+    { label: 'Max wait',  value: live.max_wait != null ? live.max_wait + 's' : '—', color: '#f97316' },
+    { label: 'Phase',     value: 'p' + (live.current_phase ?? '—'),        color: '#111' },
+    { label: 'Duration',  value: (live.phase_duration ?? '—') + 's',       color: '#111' },
   ]
   return (
     <div style={{
@@ -121,9 +118,9 @@ function QueueChart({ labels, data }) {
   }
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 10, color: '#999', marginBottom: 4 }}>Queue (vehicles)</div>
+      <div style={{ fontSize: 10, color: '#999', marginBottom: 4 }}>PCU queue</div>
       <div style={{ height: 110 }}>
-        <Line data={chartData} options={chartOpts('vehicles')} />
+        <Line data={chartData} options={chartOpts('PCU')} />
       </div>
     </div>
   )
@@ -155,7 +152,7 @@ function WaitChart({ labels, data, maWindow }) {
   return (
     <div style={{ marginBottom: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <div style={{ fontSize: 10, color: '#999' }}>Wait time</div>
+        <div style={{ fontSize: 10, color: '#999' }}>Max wait time</div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <LegendItem color="#f97316" label="avg wait" />
           <LegendItem dashed label={`MA(${maWindow})`} />
@@ -187,7 +184,7 @@ function PhaseChart({ labels, data }) {
       data,
       borderColor: '#aaa',
       backgroundColor: 'rgba(170,170,170,.05)',
-      borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.3,
+      borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0, stepped: true
     }],
   }
   return (
@@ -203,8 +200,8 @@ function PhaseChart({ labels, data }) {
 function CmdTicks({ ticks }) {
   return (
     <div style={{ display: 'flex', gap: 1, height: 3, marginTop: 8 }}>
-      {ticks.map((sw, i) => (
-        <div key={i} style={{ flex: 1, background: sw ? '#f97316' : '#f0f0f0' }} />
+      {ticks.map((action, i) => (
+        <div key={i} style={{ flex: 1, background: action === 1 ? '#f97316' : '#f0f0f0' }} />
       ))}
     </div>
   )
@@ -226,8 +223,8 @@ function JunctionCard({ jid, rows, live, cmdTicks, maWindow }) {
 
       <LiveNums live={live} />
 
-      <QueueChart labels={labels} data={rows.map(r => r.total_queue)} />
-      <WaitChart  labels={labels} data={rows.map(r => +r.avg_wait.toFixed(2))} maWindow={maWindow} />
+      <QueueChart labels={labels} data={rows.map(r => r.pcu_queue)} />
+      <WaitChart  labels={labels} data={rows.map(r => +r.max_wait.toFixed(2))} maWindow={maWindow} />
       <PhaseChart labels={labels} data={rows.map(r => r.current_phase)} />
       <CmdTicks ticks={cmdTicks} />
     </div>
@@ -252,11 +249,14 @@ export default function App() {
 
   // Summary stats derived from stateData
   const visibleJids = filterJid === 'all' ? jids : jids.filter(j => j === filterJid)
-  const totalQueue  = visibleJids.reduce((s, j) => s + (stateData[j]?.at(-1)?.total_queue ?? 0), 0)
+  const totalQueue  = visibleJids.reduce((s, j) => s + (stateData[j]?.at(-1)?.pcu_queue ?? 0), 0)
   const avgWait     = visibleJids.length
-    ? (visibleJids.reduce((s, j) => s + (stateData[j]?.at(-1)?.avg_wait ?? 0), 0) / visibleJids.length).toFixed(1)
+    ? (visibleJids.reduce((s, j) => s + (stateData[j]?.at(-1)?.max_wait ?? 0), 0) / visibleJids.length).toFixed(1)
     : null
-  const totalCmds   = visibleJids.reduce((s, j) => s + (cmdData[j]?.length ?? 0), 0)
+  // count only switch commands (action === 1)
+  const totalSwitches = visibleJids.reduce(
+    (s, j) => s + (cmdData[j]?.filter(c => c.action === 1).length ?? 0), 0
+  )
 
   // ── WebSocket ───────────────────────────────────────────────
   const wsRef = useRef(null)
@@ -280,9 +280,11 @@ export default function App() {
           setLiveData(prev => ({ ...prev, [jid]: msg }))
         }
         if (kind === 'cmd') {
+          // store the raw action value (0 or 1) so CmdTicks can colour correctly
+          const action = msg.action ?? 0
           setCmdTicks(prev => {
             const existing = prev[jid] || []
-            const updated  = [true, ...existing].slice(0, 80)
+            const updated  = [action, ...existing].slice(0, 80)
             return { ...prev, [jid]: updated }
           })
         }
@@ -387,7 +389,7 @@ export default function App() {
         junctions={visibleJids.length || null}
         totalQueue={visibleJids.length ? totalQueue : null}
         avgWait={visibleJids.length ? avgWait : null}
-        cmds={visibleJids.length ? totalCmds : null}
+        cmds={visibleJids.length ? totalSwitches : null}
       />
 
       {/* Cards */}

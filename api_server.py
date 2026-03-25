@@ -103,7 +103,7 @@ def state(jid):
     since   = time.time() - minutes * 60
     con = db()
     rows = con.execute(
-        "SELECT ts, total_queue, avg_wait, current_phase, phase_duration "
+        "SELECT ts, pcu_queue, max_wait, current_phase, phase_duration "
         "FROM junction_state WHERE junction_id=? AND ts>=? ORDER BY ts",
         (jid, since)
     ).fetchall()
@@ -116,7 +116,7 @@ def cmds(jid):
     since   = time.time() - minutes * 60
     con = db()
     rows = con.execute(
-        "SELECT ts, phase, reason FROM junction_cmd "
+        "SELECT ts, step, action FROM junction_cmd "
         "WHERE junction_id=? AND ts>=? ORDER BY ts",
         (jid, since)
     ).fetchall()
@@ -128,17 +128,17 @@ def summary():
     con = db()
     rows = con.execute("""
         SELECT s.junction_id,
-               s.total_queue, s.avg_wait, s.current_phase,
-               COALESCE(c.total_cmds, 0) AS total_cmds
+               s.pcu_queue, s.max_wait, s.current_phase,
+               COALESCE(c.total_switches, 0) AS total_switches
         FROM (
-            SELECT junction_id, total_queue, avg_wait, current_phase
+            SELECT junction_id, pcu_queue, max_wait, current_phase
             FROM junction_state
             WHERE (junction_id, ts) IN (
                 SELECT junction_id, MAX(ts) FROM junction_state GROUP BY junction_id
             )
         ) s
         LEFT JOIN (
-            SELECT junction_id, COUNT(*) AS total_cmds
+            SELECT junction_id, SUM(action) AS total_switches
             FROM junction_cmd GROUP BY junction_id
         ) c ON s.junction_id = c.junction_id
     """).fetchall()

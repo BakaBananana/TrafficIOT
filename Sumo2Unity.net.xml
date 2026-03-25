@@ -2254,11 +2254,9 @@
         <phase duration="3"  state="rryyGr"/>
     </tlLogic>
     <tlLogic id="J46" type="static" programID="0" offset="0">
-        <phase duration="27" state="GrrrGG"/>
-        <phase duration="3"  state="Grrryy"/>
-        <phase duration="27" state="GGGrrr"/>
-        <phase duration="3"  state="yyGrrr"/>
-        <phase duration="27" state="rrGGGr"/>
+        <phase duration="42" state="GgrrGG"/>
+        <phase duration="3"  state="yyrrGy"/>
+        <phase duration="42" state="rrGGGr"/>
         <phase duration="3"  state="rryyGr"/>
     </tlLogic>
 

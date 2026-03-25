@@ -34,7 +34,9 @@ import paho.mqtt.client as mqtt
 BROKER_HOST    = "localhost"
 BROKER_PORT    = 1883
 STEP_LENGTH    = 1.0    # simulation seconds per step
-ACTION_TIMEOUT = 5.0    # seconds to wait for model reply before skipping
+ACTION_TIMEOUT  = 5.0   # seconds to wait for model reply before skipping
+YELLOW_STEPS    = 3     # simulation steps for yellow clearance (matches env_sumo.step)
+MIN_GREEN_STEPS = 10    # minimum green time after a phase switch (matches env_sumo.step)
 
 # PCU weights — must match env_sumo.py and model.py
 PCU_WEIGHTS = {
@@ -76,37 +78,22 @@ def get_state(tls_ids: list[str]) -> list[list[float]]:
 
 # ── Adjacency matrix ────────────────────────────────────────────────────────
 def build_adjacency_matrix(net, tls_ids: list[str]) -> list[list[float]]:
-    n = len(tls_ids)
+    """Distance-weighted adjacency matrix as a nested list (JSON-serialisable)."""
+    n   = len(tls_ids)
     idx = {tls: i for i, tls in enumerate(tls_ids)}
-    tls_set = set(tls_ids)
-    W = [[0.0] * n for _ in range(n)]
+    W   = [[0.0] * n for _ in range(n)]
 
-    for start_tls in tls_ids:
-        start_node = net.getNode(start_tls)
-        stack = []
-        for edge in start_node.getOutgoing():
-            stack.append((edge.getToNode(), edge.getLength()))
-        
-        visited = set()
-        
-        while stack:
-            curr_node, dist = stack.pop()
-            if curr_node.getID() in visited:
-                continue
-            visited.add(curr_node.getID())
-
-            if curr_node.getType() == "traffic_light":
-                target_id = curr_node.getID()
-                if target_id in idx and target_id != start_tls:
-                    i, j = idx[start_tls], idx[target_id]
-                    weight = 100.0 / (dist + 1.0)
-                    W[i][j] = max(W[i][j], weight)
-                continue
-
-            for edge in curr_node.getOutgoing():
-                stack.append((edge.getToNode(), dist + edge.getLength()))
-
+    for tls_i in tls_ids:
+        node = net.getNode(tls_i)
+        for edge in node.getOutgoing():
+            dest = edge.getToNode()
+            if dest.getType() == "traffic_light":
+                tls_j = dest.getID()
+                if tls_j in idx:
+                    distance = edge.getLength()
+                    W[idx[tls_i]][idx[tls_j]] = 100.0 / (distance + 1.0)
     return W
+
 
 # ── Gateway ─────────────────────────────────────────────────────────────────
 class SumoGateway:
@@ -117,7 +104,6 @@ class SumoGateway:
         # Synchronisation: main loop blocks on this event until model replies
         self._action_event            = threading.Event()
         self._pending_actions: list[int] | None   = None
-        self._pending_values:  list[float] | None = None
 
         # ── Read network topology ───────────────────────────────
         print("[Gateway] Reading network topology…")
@@ -165,7 +151,6 @@ class SumoGateway:
         try:
             payload               = json.loads(msg.payload)
             self._pending_actions = payload["actions"]        # list[int], length N
-            self._pending_values  = payload.get("values", []) # list[float], length N
             self._action_event.set()
         except Exception as e:
             print(f"[Gateway] Bad actions message: {e}")
@@ -173,92 +158,124 @@ class SumoGateway:
     def _publish(self, topic: str, payload: dict):
         self.mqtt.publish(topic, json.dumps(payload), qos=1)
 
+    # ── Simulation helpers ────────────────────────────────────────
+    def _sim_step(self, step_counter: list[int], phase_starts: dict) -> bool:
+        """
+        Advance SUMO by one second, publish state for every junction, then increment counter.
+        Returns False if the simulation has ended.
+        """
+        if traci.simulation.getMinExpectedNumber() == 0:
+            return False
+        traci.simulationStep()
+        step_counter[0] += 1
+        self._publish_states(get_state(self.tls_ids), phase_starts, step_counter[0])
+        return True
+
+    def _publish_states(self, state_rows: list, phase_starts: dict, step: int):
+        """Publish traffic/{jid}/state for every junction."""
+        ts = time.time()
+        for i, jid in enumerate(self.tls_ids):
+            q, w, ph = state_rows[i]
+            self._publish(f"traffic/{jid}/state", {
+                "junction_id":    jid,
+                "step":           step,
+                "ts":             ts,
+                "current_phase":  int(ph),
+                "phase_duration": round(
+                    (step - phase_starts.get(jid, 0)) * STEP_LENGTH, 1
+                ),
+                "pcu_queue":      q,
+                "max_wait":       w,
+            })
+
+    def _publish_cmds(self, actions: list[int],
+                      state_rows: list, step: int):
+        """Publish traffic/{jid}/cmd once per decision — action is the value (0 or 1)."""
+        ts = time.time()
+        for i, jid in enumerate(self.tls_ids):
+            _, _, ph = state_rows[i]
+            self._publish(f"traffic/{jid}/cmd", {
+                "junction_id": jid,
+                "step":        step,
+                "ts":          ts,
+                "action":      actions[i],          # 0 = keep, 1 = switch
+            })
+
     # ── Main simulation loop ─────────────────────────────────────
     def run(self):
         phase_starts: dict[str, int] = {jid: 0 for jid in self.tls_ids}
-        step = 0
+        step = [0]
 
         print("[Gateway] Waiting for model to subscribe…")
-        time.sleep(2.0)   # brief grace period for the model process to connect
+        time.sleep(2.0)
         print("[Gateway] Simulation running.")
 
         try:
             while traci.simulation.getMinExpectedNumber() > 0:
-                # if step % 5 != 0:
-                #     traci.simulationStep()
-                #     step += 1
-                #     continue
 
-                # ── 1. Extract PCU-weighted state ───────────────
-                state_rows = get_state(self.tls_ids)   # list of [q, w, ph]
+                # ── 1. Observe & publish current state ──────────
+                state_rows = get_state(self.tls_ids)
+                self._publish_states(state_rows, phase_starts, step[0])
 
-                # ── 2. Publish full network state ───────────────
+                # ── 2. Ask model for actions ────────────────────
                 self._action_event.clear()
                 self._pending_actions = None
                 self._publish("traffic/network/state", {
-                    "step":    step,
+                    "step":    step[0],
                     "ts":      time.time(),
                     "tls_ids": self.tls_ids,
-                    "state":   state_rows,   # shape (N, 3) as nested list
+                    "state":   state_rows,
                 })
 
-                # ── 3. Block until model replies (or timeout) ───
                 got_reply = self._action_event.wait(timeout=ACTION_TIMEOUT)
-
                 if not got_reply or self._pending_actions is None:
-                    print(f"[Gateway] Step {step}: model timeout — holding all phases.")
+                    print(f"[Gateway] Step {step[0]}: model timeout — holding phases.")
                     actions = [0] * self.num_nodes
-                    values  = [0.0] * self.num_nodes
                 else:
                     actions = self._pending_actions
-                    values  = self._pending_values or [0.0] * self.num_nodes
 
-                # ── 4. Apply actions to SUMO ────────────────────
+                # ── 3. Publish cmd now that actions are known ───
+                self._publish_cmds(actions, state_rows, step[0])
+
+                # ── 4. Apply phase transitions ──────────────────
+                any_switch  = False
+                orig_phases: dict[str, int] = {}
+
                 for i, jid in enumerate(self.tls_ids):
                     if actions[i] == 1:
-                        current = traci.trafficlight.getPhase(jid)
+                        any_switch = True
                         logic   = traci.trafficlight.getCompleteRedYellowGreenDefinition(jid)[0]
                         n_ph    = len(logic.phases)
-                        traci.trafficlight.setPhase(jid, (current + 1) % n_ph)
-                        phase_starts[jid] = step
+                        current = traci.trafficlight.getPhase(jid)
+                        orig_phases[jid] = current
 
-                # ── 5. Publish per-junction telemetry ───────────
-                # (legacy schema kept intact — logger/dashboard unchanged)
-                for i, jid in enumerate(self.tls_ids):
-                    q, w, ph = state_rows[i]
-                    self._publish(f"traffic/{jid}/state", {
-                        "junction_id":    jid,
-                        "step":           step,
-                        "ts":             time.time(),
-                        "current_phase":  int(ph),
-                        "phase_duration": round(
-                            (step - phase_starts.get(jid, 0)) * STEP_LENGTH, 1
-                        ),
-                        "pcu_queue":      q,
-                        "max_wait":       w,
-                        "queues":         [q],       # legacy field
-                        "waiting_times":  [w],       # legacy field
-                    })
-                    self._publish(f"traffic/{jid}/cmd", {
-                        "junction_id": jid,
-                        "step":        step,
-                        "ts":          time.time(),
-                        "phase":       int(ph),
-                        "action":      actions[i],
-                        "switched":    actions[i],
-                        "reason":      "stgat",
-                        "value":       values[i] if i < len(values) else 0.0,
-                    })
+                        yellow_phase = (current + 1) % n_ph
+                        traci.trafficlight.setPhase(jid, yellow_phase)
+                        traci.trafficlight.setPhaseDuration(jid, 100_000)
 
-                # ── 6. Advance simulation clock ──────────────────
-                traci.simulationStep()
-                step += 1
+                # ── 5. Yellow clearance (3 steps, state each) ───
+                if any_switch:
+                    for _ in range(YELLOW_STEPS):
+                        if not self._sim_step(step, phase_starts):
+                            break
 
-                if step % 100 == 0:
-                    print(f"[Gateway] Step {step} | "
+                    for jid, orig in orig_phases.items():
+                        logic     = traci.trafficlight.getCompleteRedYellowGreenDefinition(jid)[0]
+                        n_ph      = len(logic.phases)
+                        new_green = (orig + 2) % n_ph
+                        traci.trafficlight.setPhase(jid, new_green)
+                        traci.trafficlight.setPhaseDuration(jid, 100_000)
+                        phase_starts[jid] = step[0]
+
+                # ── 6. Minimum green time (state each step) ─────
+                green_steps = MIN_GREEN_STEPS if any_switch else 1
+                for _ in range(green_steps):
+                    if not self._sim_step(step, phase_starts):
+                        break
+
+                if step[0] % 100 == 0:
+                    print(f"[Gateway] Step {step[0]} | "
                           f"vehicles: {traci.simulation.getMinExpectedNumber()}")
-                    
-                time.sleep(STEP_LENGTH)
 
         except KeyboardInterrupt:
             print("\n[Gateway] Interrupted.")

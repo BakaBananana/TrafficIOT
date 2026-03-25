@@ -25,8 +25,8 @@ def init_db():
             ts             REAL    NOT NULL,
             junction_id    TEXT    NOT NULL,
             step           INTEGER,
-            total_queue    INTEGER NOT NULL,
-            avg_wait       REAL    NOT NULL,
+            pcu_queue      REAL    NOT NULL,
+            max_wait       REAL    NOT NULL,
             current_phase  INTEGER NOT NULL,
             phase_duration REAL    NOT NULL
         );
@@ -35,8 +35,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS junction_cmd (
             ts             REAL    NOT NULL,
             junction_id    TEXT    NOT NULL,
-            phase          INTEGER NOT NULL,
-            reason         TEXT
+            step           INTEGER,
+            action         INTEGER NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_cmd ON junction_cmd(junction_id, ts);
     """)
@@ -65,23 +65,21 @@ class DBLogger:
 
             con = sqlite3.connect(DB_FILE)
             if kind == "state":
-                queues = payload.get("queues", [0])
-                waits  = payload.get("waiting_times", [0])
                 con.execute(
                     "INSERT INTO junction_state VALUES (?,?,?,?,?,?,?)",
                     (ts, jid,
                      payload.get("step"),
-                     sum(queues),
-                     sum(waits) / max(len(waits), 1),
-                     payload.get("current_phase", 0),
+                     payload.get("pcu_queue", 0.0),
+                     payload.get("max_wait",  0.0),
+                     payload.get("current_phase",  0),
                      payload.get("phase_duration", 0.0))
                 )
             elif kind == "cmd":
                 con.execute(
                     "INSERT INTO junction_cmd VALUES (?,?,?,?)",
                     (ts, jid,
-                     payload.get("phase", 0),
-                     payload.get("reason", ""))
+                     payload.get("step"),
+                     payload.get("action", 0))
                 )
             con.commit()
             con.close()
