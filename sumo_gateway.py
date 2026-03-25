@@ -184,6 +184,10 @@ class SumoGateway:
 
         try:
             while traci.simulation.getMinExpectedNumber() > 0:
+                # if step % 5 != 0:
+                #     traci.simulationStep()
+                #     step += 1
+                #     continue
 
                 # ── 1. Extract PCU-weighted state ───────────────
                 state_rows = get_state(self.tls_ids)   # list of [q, w, ph]
@@ -253,6 +257,8 @@ class SumoGateway:
                 if step % 100 == 0:
                     print(f"[Gateway] Step {step} | "
                           f"vehicles: {traci.simulation.getMinExpectedNumber()}")
+                    
+                time.sleep(STEP_LENGTH)
 
         except KeyboardInterrupt:
             print("\n[Gateway] Interrupted.")
