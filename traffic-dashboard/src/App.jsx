@@ -21,9 +21,7 @@ function movingAvg(data, win) {
 }
 
 function fmtTime(ts) {
-  return new Date(ts * 1000).toLocaleTimeString([], {
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-  })
+  return `t=${Math.floor(ts)}s`
 }
 
 // ── Shared chart options factory ──────────────────────────────
@@ -217,7 +215,7 @@ function JunctionCard({ jid, rows, live, cmdTicks, maWindow }) {
       }}>
         <span style={{ fontSize: 13, fontWeight: 500 }}>{jid}</span>
         <span style={{ fontSize: 11, color: '#999' }}>
-          {live ? new Date().toLocaleTimeString() : '—'}
+          {live ? `t=${Math.floor(live.ts)}s` : '—'}
         </span>
       </div>
 
@@ -246,6 +244,11 @@ export default function App() {
   const [apiStatus,  setApiStatus]  = useState(false)
   const [apiError,   setApiError]   = useState(false)
   const [lastPoll,   setLastPoll]   = useState(null)
+  const rangeSeconds = {
+    "5": 300,
+    "15": 900,
+    "60": 3600,
+  }[rangeMin]
 
   // Summary stats derived from stateData
   const visibleJids = filterJid === 'all' ? jids : jids.filter(j => j === filterJid)
@@ -299,30 +302,51 @@ export default function App() {
 
   // ── Historical poll ─────────────────────────────────────────
   const poll = useCallback(async () => {
-    try {
-      const discovered = await fetch(`${API}/junctions`).then(r => r.json())
-      if (!discovered.length) { setApiError(true); setApiStatus(false); return }
+  try {
+    // 1. get current simulation time
+    const { sim_ts } = await fetch(`${API}/sim_time`).then(r => r.json())
 
-      setJids(prev => {
-        const merged = [...new Set([...prev, ...discovered])]
-        return merged.length !== prev.length ? merged : prev
-      })
-      setApiStatus(true); setApiError(false)
+    const since = Math.max(0, sim_ts - rangeSeconds)
 
-      const [states, cmds] = await Promise.all([
-        Promise.all(discovered.map(j => fetch(`${API}/state/${j}?minutes=${rangeMin}`).then(r => r.json()))),
-        Promise.all(discovered.map(j => fetch(`${API}/cmds/${j}?minutes=${rangeMin}`).then(r => r.json()))),
-      ])
+    const discovered = await fetch(`${API}/junctions`).then(r => r.json())
+    if (!discovered.length) { setApiError(true); setApiStatus(false); return }
 
-      const newState = {}, newCmds = {}
-      discovered.forEach((jid, i) => { newState[jid] = states[i]; newCmds[jid] = cmds[i] })
-      setStateData(newState)
-      setCmdData(newCmds)
-      setLastPoll(new Date().toLocaleTimeString())
-    } catch {
-      setApiStatus(false); setApiError(true)
-    }
-  }, [rangeMin])
+    setJids(prev => {
+      const merged = [...new Set([...prev, ...discovered])]
+      return merged.length !== prev.length ? merged : prev
+    })
+
+    setApiStatus(true); setApiError(false)
+
+    // 2. use since instead of minutes
+    const [states, cmds] = await Promise.all([
+      Promise.all(
+        discovered.map(j =>
+          fetch(`${API}/state/${j}?since=${since}&limit=200`).then(r => r.json())
+        )
+      ),
+      Promise.all(
+        discovered.map(j =>
+          fetch(`${API}/cmds/${j}?since=${since}&limit=200`).then(r => r.json())
+        )
+      ),
+    ])
+
+    const newState = {}, newCmds = {}
+    discovered.forEach((jid, i) => {
+      newState[jid] = states[i]
+      newCmds[jid] = cmds[i]
+    })
+
+    setStateData(newState)
+    setCmdData(newCmds)
+
+    // show simulation time instead of wall time
+    setLastPoll(`t=${Math.floor(sim_ts)}s`)
+  } catch {
+    setApiStatus(false); setApiError(true)
+  }
+}, [rangeMin])
 
   useEffect(() => {
     poll()

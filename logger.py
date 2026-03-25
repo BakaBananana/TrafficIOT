@@ -10,7 +10,7 @@ No SUMO dependency. Runs independently alongside any other subscribers.
 
 import json
 import sqlite3
-import time
+import os
 import paho.mqtt.client as mqtt
 
 BROKER_HOST = "localhost"
@@ -19,6 +19,8 @@ DB_FILE     = "traffic.db"
 
 
 def init_db():
+    if os.path.exists(DB_FILE):
+        os.remove(DB_FILE)  # delete old database
     con = sqlite3.connect(DB_FILE)
     con.executescript("""
         CREATE TABLE IF NOT EXISTS junction_state (
