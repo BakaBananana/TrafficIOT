@@ -82,16 +82,26 @@ def build_adjacency_matrix(net, tls_ids: list[str]) -> list[list[float]]:
     n   = len(tls_ids)
     idx = {tls: i for i, tls in enumerate(tls_ids)}
     W   = [[0.0] * n for _ in range(n)]
-
+    
     for tls_i in tls_ids:
+        idx_i = idx[tls_i]
         node = net.getNode(tls_i)
-        for edge in node.getOutgoing():
-            dest = edge.getToNode()
-            if dest.getType() == "traffic_light":
-                tls_j = dest.getID()
+        outgoing_edges = [edge for edge in node.getOutgoing()]
+        
+        for edge in outgoing_edges:
+            dest_node = edge.getToNode()
+            if dest_node.getType() == "traffic_light":
+                tls_j = dest_node.getID()
                 if tls_j in idx:
+                    idx_j = idx[tls_j]
                     distance = edge.getLength()
-                    W[idx[tls_i]][idx[tls_j]] = 100.0 / (distance + 1.0)
+                    weight = 100.0 / (distance + 1.0) 
+                    W[idx_i][idx_j] = weight
+                    
+    # GAT Self-Loops: Intersections must monitor their own queues!
+    for i in range(n):
+        W[i][i] = 100.0  
+        
     return W
 
 

@@ -2,10 +2,10 @@
 title SUMO Traffic IoT — Launcher
 
 :: ── Config ────────────────────────────────────────────────────
-set SUMO_CFG=Sumo2Unity.sumocfg
-set SUMO_NET=Sumo2Unity.net.xml
+set SUMO_CFG=stc_simulation.sumocfg
+set SUMO_NET=patna_stc.net.xml
 set MODEL_PTH=stgat_ppo_best.pth
-set "MOSQUITTO=C:\Program Files\Mosquitto\mosquitto.exe"
+set "MOSQUITTO=.\Mosquitto\mosquitto.exe"
 set PYTHON=python
 
 echo.

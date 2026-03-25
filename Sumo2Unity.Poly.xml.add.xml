@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-
-<!-- generated on 2026-02-20T12:45:41.364465+05:30 by Eclipse SUMO netedit 1.26.0
--->
-
-<additional xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/additional_file.xsd">
-    <!-- Shapes -->
-    <poly id="po_0" type="Terrain" color="129,200,90" fill="0" layer="0.00" shape="-50.520000,395.590000 -310.470000,284.180000 -576.600000,89.840000 -640.970000,-180.010000 -149.550000,-375.340000 538.080000,-270.500000 333.830000,203.350000 -50.510000,395.720000"/>
-</additional>
