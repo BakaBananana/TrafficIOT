@@ -183,7 +183,7 @@ class SumoGateway:
 
     def _publish_states(self, state_rows: list, phase_starts: dict, step: int):
         """Publish traffic/{jid}/state for every junction."""
-        ts = time.time()
+        ts = traci.simulation.getTime()
         for i, jid in enumerate(self.tls_ids):
             q, w, ph = state_rows[i]
             self._publish(f"traffic/{jid}/state", {
@@ -201,7 +201,7 @@ class SumoGateway:
     def _publish_cmds(self, actions: list[int],
                       state_rows: list, step: int):
         """Publish traffic/{jid}/cmd once per decision — action is the value (0 or 1)."""
-        ts = time.time()
+        ts = traci.simulation.getTime()
         for i, jid in enumerate(self.tls_ids):
             _, _, ph = state_rows[i]
             self._publish(f"traffic/{jid}/cmd", {
@@ -232,7 +232,7 @@ class SumoGateway:
                 self._pending_actions = None
                 self._publish("traffic/network/state", {
                     "step":    step[0],
-                    "ts":      time.time(),
+                    "ts":      traci.simulation.getTime(),
                     "tls_ids": self.tls_ids,
                     "state":   state_rows,
                 })

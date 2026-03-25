@@ -61,7 +61,7 @@ class DBLogger:
             payload = json.loads(msg.payload)
             parts   = msg.topic.split("/")
             jid, kind = parts[1], parts[2]
-            ts = payload.get("ts", time.time())
+            ts = payload.get("ts")
 
             con = sqlite3.connect(DB_FILE)
             if kind == "state":
