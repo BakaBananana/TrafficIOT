@@ -1,6 +1,6 @@
 ISSUE:
-Actions are all one. This shouldn't happend and model is correct.
 dashboard: live update
+dashboard: aggregate
 
 TODO:
 Decision calls non blocking

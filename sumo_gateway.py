@@ -151,12 +151,12 @@ class SumoGateway:
     # ── MQTT callbacks ───────────────────────────────────────────
     def _on_connect(self, client, userdata, flags, rc):
         print(f"[Gateway] MQTT connected (rc={rc})")
-        client.subscribe("traffic/network/actions")
+        client.subscribe("network/actions")
 
         # Retained topology: model gets this the moment it subscribes,
         # regardless of startup order.
         client.publish(
-            "traffic/network/topology",
+            "network/topology",
             json.dumps({
                 "tls_ids":    self.tls_ids,
                 "adj_matrix": self.adj_matrix,
@@ -240,7 +240,7 @@ class SumoGateway:
                 # ── 2. Ask model for actions ────────────────────
                 self._action_event.clear()
                 self._pending_actions = None
-                self._publish("traffic/network/state", {
+                self._publish("network/state", {
                     "step":    step[0],
                     "ts":      traci.simulation.getTime(),
                     "tls_ids": self.tls_ids,

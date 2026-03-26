@@ -59,8 +59,8 @@ class STGATModelClient:
     def _on_connect(self, client, userdata, flags, rc):
         print(f"[Model] MQTT connected (rc={rc})")
         # Topology is retained — we'll receive it immediately on subscribe
-        client.subscribe("traffic/network/topology", qos=1)
-        client.subscribe("traffic/network/state",      qos=1)
+        client.subscribe("network/topology", qos=1)
+        client.subscribe("network/state",      qos=1)
 
     def _on_message(self, client, userdata, msg):
         topic = msg.topic
@@ -70,9 +70,9 @@ class STGATModelClient:
             print(f"[Model] JSON parse error on {topic}: {e}")
             return
 
-        if topic == "traffic/network/topology":
+        if topic == "network/topology":
             self._handle_topology(payload)
-        elif topic == "traffic/network/state":
+        elif topic == "network/state":
             self._handle_state_batch(payload)
 
     # ── Topology handler ─────────────────────────────────────────
@@ -148,7 +148,7 @@ class STGATModelClient:
 
         # ── Publish batch actions to gateway ─────────────────────
         self.mqtt.publish(
-            "traffic/network/actions",
+            "network/actions",
             json.dumps({
                 "step":    step,
                 "actions": actions_list,         # index matches tls_ids order
