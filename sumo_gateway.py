@@ -48,7 +48,7 @@ PCU_WEIGHTS = {
 
 
 # ── State extraction ────────────────────────────────────────────────────────
-def get_state(tls_ids: list[str]) -> list[list[float]]:
+def get_state(tls_ids: list[str], normalized=False) -> list[list[float]]:
     """
     PCU-weighted state for all junctions.
     Returns list of [pcu_queue, max_wait, phase_index] per junction,
@@ -72,7 +72,18 @@ def get_state(tls_ids: list[str]) -> list[list[float]]:
                         max_wait = wait_time
 
         phase = traci.trafficlight.getPhase(tls)
-        rows.append([round(pcu_queue, 2), round(max_wait, 2), float(phase)])
+        logic = traci.trafficlight.getCompleteRedYellowGreenDefinition(tls)[0]
+        num_phases = len(logic.phases)
+        
+        # Dynamic Normalization (Scales perfectly regardless of phase count)
+        scaled_queue = pcu_queue / 50.0  
+        scaled_wait = max_wait / 100.0    
+        scaled_phase = phase / float(num_phases)     
+        
+        if normalized:
+            rows.append([scaled_queue, scaled_wait, scaled_phase])
+        else:
+            rows.append([round(pcu_queue, 2), round(max_wait, 2), float(phase)])
     return rows
 
 
@@ -198,12 +209,10 @@ class SumoGateway:
                 "max_wait":       w,
             })
 
-    def _publish_cmds(self, actions: list[int],
-                      state_rows: list, step: int):
+    def _publish_cmds(self, actions: list[int], step: int):
         """Publish traffic/{jid}/cmd once per decision — action is the value (0 or 1)."""
         ts = traci.simulation.getTime()
         for i, jid in enumerate(self.tls_ids):
-            _, _, ph = state_rows[i]
             self._publish(f"traffic/{jid}/cmd", {
                 "junction_id": jid,
                 "step":        step,
@@ -225,6 +234,7 @@ class SumoGateway:
 
                 # ── 1. Observe & publish current state ──────────
                 state_rows = get_state(self.tls_ids)
+                normalized_state_rows = get_state(self.tls_ids, normalized=True)
                 self._publish_states(state_rows, phase_starts, step[0])
 
                 # ── 2. Ask model for actions ────────────────────
@@ -234,7 +244,7 @@ class SumoGateway:
                     "step":    step[0],
                     "ts":      traci.simulation.getTime(),
                     "tls_ids": self.tls_ids,
-                    "state":   state_rows,
+                    "state":   normalized_state_rows,
                 })
 
                 got_reply = self._action_event.wait(timeout=ACTION_TIMEOUT)
@@ -245,7 +255,7 @@ class SumoGateway:
                     actions = self._pending_actions
 
                 # ── 3. Publish cmd now that actions are known ───
-                self._publish_cmds(actions, state_rows, step[0])
+                self._publish_cmds(actions, step[0])
 
                 # ── 4. Apply phase transitions ──────────────────
                 any_switch  = False

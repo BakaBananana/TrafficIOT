@@ -136,7 +136,9 @@ class STGATModelClient:
                 state_dev, self.adj, self.h_prev
             )
             # Deterministic: argmax over action dimension
-            actions = torch.argmax(action_probs, dim=-1)   # (1, N)
+            # actions = torch.argmax(action_probs, dim=-1)   # (1, N)
+            m = torch.distributions.Categorical(action_probs)
+            actions = m.sample()
 
         # Carry hidden state forward (the key reason the model must be stateful)
         self.h_prev = h_new
