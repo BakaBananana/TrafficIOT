@@ -1,9 +1,7 @@
 ISSUE:
-dashboard: live update
-dashboard: aggregate
+dashboard: simulation time instead of current time
 
 TODO:
 Decision calls non blocking
-sqlite -> timeseries db
 docs
 twin
