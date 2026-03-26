@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Traffic Junction Monitor</title>
+
+<!-- Chart.js only — NO date adapter needed -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:      #090c10;
+    --surface: #0f1318;
+    --border:  #1e2530;
+    --accent:  #00e5ff;
+    --accent2: #ff4d6d;
+    --accent3: #b8ff57;
+    --accent4: #c084fc;
+    --muted:   #4a5568;
+    --text:    #e2e8f0;
+    --sub:     #718096;
+    --radius:  6px;
+    --mono:    'Space Mono', monospace;
+    --sans:    'Syne', sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; }
+
+  #app { display: grid; grid-template-rows: auto auto 1fr; height: 100vh; overflow: hidden; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 24px; border-bottom: 1px solid var(--border); background: var(--surface);
+  }
+  header h1 { font-size: 17px; font-weight: 800; letter-spacing: .04em; color: var(--accent); text-transform: uppercase; }
+  header h1 span { color: var(--text); }
+  #status { font-family: var(--mono); font-size: 11px; color: var(--sub); display: flex; align-items: center; gap: 8px; }
+  #dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: background .3s; }
+  #dot.live { background: var(--accent3); box-shadow: 0 0 8px var(--accent3); }
+
+  #error-banner {
+    display: none; align-items: center; gap: 10px;
+    padding: 10px 24px; background: rgba(255,77,109,.12); border-bottom: 1px solid rgba(255,77,109,.3);
+    font-family: var(--mono); font-size: 12px; color: var(--accent2);
+  }
+  #error-banner.show { display: flex; }
+  #error-banner a { color: var(--accent2); text-decoration: underline; cursor: pointer; margin-left: auto; }
+
+  main { display: grid; grid-template-columns: 220px 1fr; overflow: hidden; }
+
+  aside { background: var(--surface); border-right: 1px solid var(--border); overflow-y: auto; padding: 12px 0; }
+  .aside-title { font-size: 10px; font-weight: 700; color: var(--sub); letter-spacing: .12em; text-transform: uppercase; padding: 0 16px 8px; }
+  .junction-btn {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; padding: 9px 16px; border: none; background: none; cursor: pointer;
+    color: var(--sub); font-family: var(--mono); font-size: 12px;
+    transition: background .15s, color .15s; text-align: left; gap: 8px;
+  }
+  .junction-btn:hover  { background: rgba(0,229,255,.06); color: var(--text); }
+  .junction-btn.active { background: rgba(0,229,255,.10); color: var(--accent); }
+  .junction-btn .badge { font-size: 10px; padding: 1px 6px; border-radius: 99px; background: var(--border); color: var(--sub); font-family: var(--mono); white-space: nowrap; }
+  .junction-btn.active .badge { background: rgba(0,229,255,.15); color: var(--accent); }
+  .aside-divider { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+
+  #content { overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 20px; }
+
+  .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+  .stat-label { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--sub); }
+  .stat-value { font-family: var(--mono); font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
+  .stat-value.c1 { color: var(--accent);  }
+  .stat-value.c2 { color: var(--accent2); }
+  .stat-value.c3 { color: var(--accent3); }
+  .stat-value.c4 { color: var(--accent4); }
+  .stat-sub { font-family: var(--mono); font-size: 11px; color: var(--sub); }
+
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 8px; }
+  .panel-title { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--sub); }
+  .panel-body { padding: 16px; }
+
+  .cw     { position: relative; height: 200px; }
+  .cw-sm  { position: relative; height: 120px; }
+  .cw-net { position: relative; height: 180px; }
+
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  label { font-size: 11px; color: var(--sub); font-family: var(--mono); white-space: nowrap; }
+  select, input[type=range] {
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 4px; font-family: var(--mono); font-size: 12px; padding: 4px 8px; outline: none;
+  }
+  select:focus { border-color: var(--accent); }
+  input[type=range] { accent-color: var(--accent); padding: 0; width: 120px; }
+  .wval { font-family: var(--mono); font-size: 12px; color: var(--accent); min-width: 28px; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .net-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 10px; }
+  .net-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; transition: border-color .2s, background .2s; }
+  .net-card:hover { border-color: var(--accent); background: rgba(0,229,255,.04); }
+  .net-card.sel   { border-color: var(--accent); background: rgba(0,229,255,.07); }
+  .net-card .nc-id  { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--accent); }
+  .net-card .nc-row { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; }
+  .nc-k { color: var(--sub); }
+  .nc-v { color: var(--text); }
+  .heat { height: 3px; border-radius: 2px; margin-top: 6px; background: linear-gradient(90deg, var(--accent3), var(--accent2)); }
+
+  ::-webkit-scrollbar       { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+    aside { border-right: none; border-bottom: 1px solid var(--border); }
+    .stats-row { grid-template-columns: repeat(2,1fr); }
+    .two-col { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Traffic <span>Junction Monitor</span></h1>
+    <div id="status"><div id="dot"></div><span id="status-text">Connecting…</span></div>
+  </header>
+
+  <div id="error-banner">
+    ⚠ Cannot reach API at <code>http://localhost:8000</code> — run:
+    <code>uvicorn api_server:app --port 8000</code>
+    <a onclick="this.parentElement.classList.remove('show')">dismiss</a>
+  </div>
+
+  <main>
+    <aside>
+      <div class="aside-title">Junctions</div>
+      <div id="junction-list"></div>
+      <hr class="aside-divider" />
+      <button class="junction-btn" id="btn-network" onclick="selectView('network')">
+        <span>🌐 Network Overview</span>
+      </button>
+    </aside>
+
+    <div id="content">
+
+      <!-- JUNCTION VIEW -->
+      <div id="view-junction" style="display:none;flex-direction:column;gap:20px;">
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-label">PCU Queue</div>
+            <div class="stat-value c1" id="s-pcu">—</div>
+            <div class="stat-sub" id="s-pcu-avg">avg —</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Max Wait (s)</div>
+            <div class="stat-value c2" id="s-wait">—</div>
+            <div class="stat-sub" id="s-wait-avg">avg —</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Phase</div>
+            <div class="stat-value c4" id="s-phase">—</div>
+            <div class="stat-sub" id="s-phase-dur">dur —</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Sim Step</div>
+            <div class="stat-value c3" id="s-step">—</div>
+            <div class="stat-sub" id="s-ts">ts —</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Moving Average</span>
+            <div class="controls">
+              <label>Field</label>
+              <select id="ma-field" onchange="fetchMA()">
+                <option value="pcu_queue">PCU Queue</option>
+                <option value="max_wait">Max Wait</option>
+              </select>
+              <label>Window</label>
+              <input type="range" id="ma-window" min="2" max="120" value="30" oninput="onWinChange()" />
+              <span class="wval" id="ma-wval">30</span>
+            </div>
+          </div>
+          <div class="panel-body"><div class="cw"><canvas id="ma-chart"></canvas></div></div>
+        </div>
+
+        <div class="two-col">
+          <div class="panel">
+            <div class="panel-header"><span class="panel-title">PCU Queue — Live</span></div>
+            <div class="panel-body"><div class="cw"><canvas id="pcu-chart"></canvas></div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-header"><span class="panel-title">Max Wait — Live</span></div>
+            <div class="panel-body"><div class="cw"><canvas id="wait-chart"></canvas></div></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Signal Phase — Stepped</span></div>
+          <div class="panel-body"><div class="cw-sm"><canvas id="phase-chart"></canvas></div></div>
+        </div>
+      </div>
+
+      <!-- NETWORK VIEW -->
+      <div id="view-network" style="display:none;flex-direction:column;gap:20px;">
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-label">Avg Network PCU</div>
+            <div class="stat-value c1" id="n-pcu">—</div>
+            <div class="stat-sub">total avg across junctions</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Avg Network Wait</div>
+            <div class="stat-value c2" id="n-wait">—</div>
+            <div class="stat-sub">total avg across junctions</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Peak Network PCU</div>
+            <div class="stat-value c3" id="n-peak-pcu">—</div>
+            <div class="stat-sub">worst timestep sum</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Worst Wait Ever</div>
+            <div class="stat-value c2" id="n-peak-wait">—</div>
+            <div class="stat-sub">worst single junction</div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Network Timeseries — Total PCU &amp; Worst Wait</span></div>
+          <div class="panel-body"><div class="cw-net"><canvas id="net-chart"></canvas></div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Per-Junction Overview</span></div>
+          <div class="panel-body"><div class="net-grid" id="net-grid"></div></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+const API = "http://localhost:8000";
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+// Format Unix-epoch seconds → "HH:MM:SS"
+function fmtTs(ts) {
+  const d = new Date(ts * 1000);
+  const p = n => String(n).padStart(2, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+// Convert rows to {x: ts (seconds, raw number), y: value}
+// We keep x as a plain number (epoch seconds) and use a linear scale.
+// Tick labels are formatted with fmtTs().
+const toXY = (rows, key) => rows.map(r => ({ x: r.ts, y: r[key] }));
+
+// ── Chart options factory (linear x = ts in epoch-seconds) ────────────────
+function makeOpts({ yLabel = "", yMin, yMax, dualY = false, stepped = false } = {}) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: { display: true, labels: { boxWidth: 10, padding: 12, color: "#718096" } },
+      tooltip: {
+        callbacks: {
+          // Show the x-value as a clock time in the tooltip title
+          title: items => fmtTs(items[0].parsed.x)
+        }
+      }
+    },
+    scales: {
+      x: {
+        type: "linear",       // ← plain number axis, no adapter needed
+        ticks: {
+          maxTicksLimit: 7,
+          maxRotation: 0,
+          callback: val => fmtTs(val)   // format each tick as HH:MM:SS
+        },
+        grid: { color: "#1a2030" }
+      },
+      y: {
+        beginAtZero: true,
+        title: { display: !!yLabel, text: yLabel, color: "#4a5568" },
+        grid: { color: "#1a2030" },
+        ...(yMin !== undefined ? { min: yMin } : {}),
+        ...(yMax !== undefined ? { max: yMax } : {})
+      },
+      ...(dualY ? {
+        y1: {
+          position: "right", beginAtZero: true,
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: "Wait (s)", color: "#4a5568" }
+        }
+      } : {})
+    }
+  };
+}
+
+// ── Safe chart rebuild ─────────────────────────────────────────────────────
+// Uses Chart.getChart() so it always finds the live instance even if the JS
+// variable went stale — prevents "canvas already in use" errors.
+function rebuild(canvasId, data, opts) {
+  const existing = Chart.getChart(canvasId);
+  if (existing) existing.destroy();
+  return new Chart(
+    document.getElementById(canvasId).getContext("2d"),
+    { type: "line", data, options: opts }
+  );
+}
+
+// ── App state ──────────────────────────────────────────────────────────────
+let junctions = [], selectedJunction = null, view = null;
+let maChart, pcuChart, waitChart, phaseChart, netChart;
+let maTimer = null, liveData = {};
+
+// ── Init ───────────────────────────────────────────────────────────────────
+async function init() {
+  const data = await apiFetch(`${API}/junctions`);
+  if (!data) return;
+  junctions = data.junctions;
+  renderSidebar();
+  if (junctions.length) selectView("junction", junctions[0]);
+  else selectView("network");
+}
+
+function renderSidebar() {
+  document.getElementById("junction-list").innerHTML = junctions.map(j =>
+    `<button class="junction-btn" id="btn-${j}" onclick="selectView('junction','${j}')">
+       <span>${j}</span><span class="badge" id="badge-${j}">—</span>
+     </button>`
+  ).join("");
+}
+
+// ── View switching ─────────────────────────────────────────────────────────
+function selectView(type, jid) {
+  document.querySelectorAll(".junction-btn").forEach(b => b.classList.remove("active"));
+  if (type === "network") {
+    view = "network";
+    document.getElementById("btn-network").classList.add("active");
+    document.getElementById("view-junction").style.display = "none";
+    document.getElementById("view-network").style.display  = "flex";
+    loadNetworkView();
+  } else {
+    view = "junction"; selectedJunction = jid;
+    const btn = document.getElementById(`btn-${jid}`);
+    if (btn) btn.classList.add("active");
+    document.getElementById("view-junction").style.display = "flex";
+    document.getElementById("view-network").style.display  = "none";
+    loadJunctionCharts();
+  }
+}
+
+// ── Junction charts ────────────────────────────────────────────────────────
+async function loadJunctionCharts() {
+  if (!selectedJunction) return;
+  clearTimeout(maTimer);
+
+  const res = await apiFetch(`${API}/state/${selectedJunction}?limit=200`);
+  if (!res) return;
+  const rows = res.rows;
+
+  pcuChart = rebuild("pcu-chart",
+    { datasets: [{ label: "PCU Queue", data: toXY(rows, "pcu_queue"),
+        borderColor: "#00e5ff", backgroundColor: "rgba(0,229,255,.07)",
+        borderWidth: 1.5, pointRadius: 0, fill: true, tension: .3 }] },
+    makeOpts({ yLabel: "PCU" }));
+
+  waitChart = rebuild("wait-chart",
+    { datasets: [{ label: "Max Wait", data: toXY(rows, "max_wait"),
+        borderColor: "#ff4d6d", backgroundColor: "rgba(255,77,109,.07)",
+        borderWidth: 1.5, pointRadius: 0, fill: true, tension: .3 }] },
+    makeOpts({ yLabel: "s" }));
+
+  // Stepped phase chart — integer y, stepped: "before"
+  const phOpts = makeOpts({ yLabel: "Phase", yMin: -0.5 });
+  phOpts.scales.y.ticks = { stepSize: 1, precision: 0 };
+  phaseChart = rebuild("phase-chart",
+    { datasets: [{ label: "Signal Phase", data: toXY(rows, "current_phase"),
+        borderColor: "#c084fc", backgroundColor: "rgba(192,132,252,.15)",
+        borderWidth: 2, pointRadius: 0, fill: true,
+        stepped: "before" }] },   // hard vertical jumps between phases
+    phOpts);
+
+  fetchMA();
+}
+
+// ── Moving average ─────────────────────────────────────────────────────────
+async function fetchMA() {
+  if (!selectedJunction) return;
+  clearTimeout(maTimer);
+  const field = document.getElementById("ma-field").value;
+  const win   = document.getElementById("ma-window").value;
+  const res   = await apiFetch(
+    `${API}/moving_average/${selectedJunction}?field=${field}&window=${win}&limit=300`);
+  if (!res) return;
+
+  const col = field === "pcu_queue" ? "#00e5ff" : "#ff4d6d";
+  maChart = rebuild("ma-chart",
+    { datasets: [
+        { label: "Raw",
+          data: res.data.map(d => ({ x: d.ts, y: d.raw })),
+          borderColor: "rgba(255,255,255,.18)", borderWidth: 1, pointRadius: 0, tension: .3 },
+        { label: `MA(${win})`,
+          data: res.data.map(d => ({ x: d.ts, y: d.ma })),
+          borderColor: col, borderWidth: 2.5, pointRadius: 0, tension: .4 }
+      ] },
+    makeOpts({ yLabel: field === "pcu_queue" ? "PCU" : "s" }));
+
+  maTimer = setTimeout(fetchMA, 5000);
+}
+
+function onWinChange() {
+  document.getElementById("ma-wval").textContent = document.getElementById("ma-window").value;
+  fetchMA();
+}
+
+// ── Network view ───────────────────────────────────────────────────────────
+async function loadNetworkView() {
+  const res = await apiFetch(`${API}/network_summary`);
+  if (!res) return;
+
+  document.getElementById("n-pcu").textContent       = res.network.avg_total_pcu_queue.toFixed(2);
+  document.getElementById("n-wait").textContent      = res.network.avg_total_max_wait.toFixed(2);
+  document.getElementById("n-peak-pcu").textContent  = res.network.peak_total_pcu_queue.toFixed(2);
+  document.getElementById("n-peak-wait").textContent = res.network.worst_single_junction_wait.toFixed(2);
+
+  const ts = res.timeseries;
+  const nopts = makeOpts({ dualY: true });
+  nopts.scales.y.title  = { display: true, text: "Total PCU",      color: "#4a5568" };
+  nopts.scales.y1.title = { display: true, text: "Worst Wait (s)", color: "#4a5568" };
+
+  netChart = rebuild("net-chart",
+    { datasets: [
+        { label: "Total PCU",
+          data: ts.map(r => ({ x: r.ts, y: r.total_pcu })),
+          borderColor: "#00e5ff", borderWidth: 1.5, pointRadius: 0, fill: false, tension: .3, yAxisID: "y" },
+        { label: "Worst Wait",
+          data: ts.map(r => ({ x: r.ts, y: r.worst_wait })),
+          borderColor: "#ff4d6d", borderWidth: 1.5, pointRadius: 0, fill: false, tension: .3, yAxisID: "y1" }
+      ] },
+    nopts);
+
+  const maxPcu = Math.max(...res.per_junction.map(j => j.avg_pcu), 1);
+  document.getElementById("net-grid").innerHTML = res.per_junction.map(j => `
+    <div class="net-card ${selectedJunction === j.junction_id ? "sel" : ""}"
+         onclick="selectView('junction','${j.junction_id}')">
+      <div class="nc-id">${j.junction_id}</div>
+      <div class="nc-row"><span class="nc-k">avg pcu</span> <span class="nc-v">${j.avg_pcu.toFixed(2)}</span></div>
+      <div class="nc-row"><span class="nc-k">avg wait</span><span class="nc-v">${j.avg_wait.toFixed(2)}s</span></div>
+      <div class="nc-row"><span class="nc-k">peak pcu</span><span class="nc-v">${j.peak_pcu.toFixed(2)}</span></div>
+      <div class="nc-row"><span class="nc-k">samples</span> <span class="nc-v">${j.samples}</span></div>
+      <div class="heat" style="width:${(j.avg_pcu / maxPcu * 100).toFixed(1)}%"></div>
+    </div>`).join("");
+}
+
+// ── Live poll — 1 s ────────────────────────────────────────────────────────
+async function pollLive() {
+  const res = await apiFetch(`${API}/live`);
+  if (!res) return;
+
+  setStatus(true, `Live · ${new Date().toLocaleTimeString()}`);
+  res.junctions.forEach(j => {
+    liveData[j.junction_id] = j;
+    const b = document.getElementById(`badge-${j.junction_id}`);
+    if (b) b.textContent = j.pcu_queue.toFixed(1);
+  });
+
+  if (view === "junction" && selectedJunction && liveData[selectedJunction]) {
+    const j = liveData[selectedJunction];
+    document.getElementById("s-pcu").textContent       = j.pcu_queue.toFixed(2);
+    document.getElementById("s-wait").textContent      = j.max_wait.toFixed(2);
+    document.getElementById("s-phase").textContent     = j.current_phase;
+    document.getElementById("s-step").textContent      = j.step ?? "—";
+    document.getElementById("s-phase-dur").textContent = `dur ${j.phase_duration.toFixed(1)}s`;
+    document.getElementById("s-ts").textContent        = `ts ${j.ts.toFixed(1)}`;
+
+    pushPt(pcuChart,   j.ts, j.pcu_queue,     200);
+    pushPt(waitChart,  j.ts, j.max_wait,      200);
+    pushPt(phaseChart, j.ts, j.current_phase, 200);
+  }
+
+  if (view === "network") {
+    if (!pollLive._t || Date.now() - pollLive._t > 5000) {
+      pollLive._t = Date.now();
+      loadNetworkView();
+    }
+  }
+}
+
+// Append a single {x,y} point to dataset 0, capped at maxPts
+function pushPt(chart, x, y, maxPts) {
+  if (!chart) return;
+  const ds = chart.data.datasets[0];
+  ds.data.push({ x, y });
+  if (ds.data.length > maxPts) ds.data.shift();
+  chart.update("none");
+}
+
+// ── API fetch — shows error banner on failure ──────────────────────────────
+async function apiFetch(url) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    document.getElementById("error-banner").classList.remove("show");
+    return data;
+  } catch {
+    setStatus(false, "API unreachable");
+    document.getElementById("error-banner").classList.add("show");
+    return null;
+  }
+}
+
+function setStatus(ok, msg) {
+  document.getElementById("dot").className          = ok ? "live" : "";
+  document.getElementById("status-text").textContent = msg;
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+init().then(() => {
+  setInterval(pollLive, 1000);
+  setInterval(() => { if (view === "junction") loadJunctionCharts(); }, 30000);
+});
+</script>
+</body>
+</html>

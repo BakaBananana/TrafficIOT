@@ -25,18 +25,19 @@ timeout /t 1 /nobreak >nul
 start "Decision Model" cmd /k "%PYTHON% stgat_model_client.py --model %MODEL_PTH%"
 timeout /t 1 /nobreak >nul
 
-:: T4 — API + WebSocket Server
-start "API Server" cmd /k "%PYTHON% api_server.py"
+:: T4 — API Server
+start "API Server" cmd /k "uvicorn api_server:app --reload --port 8000"
 timeout /t 2 /nobreak >nul
 
 :: T5 — SUMO Gateway (last — simulation drives everything)
 start "SUMO Gateway" cmd /k "%PYTHON% sumo_gateway.py --cfg %SUMO_CFG% --net %SUMO_NET%"
-timeout /t 2 /nobreak >nul
+timeout /t 5 /nobreak >nul
 
 :: Open dashboard in default browser
-start "Dashboard" cmd /k "cd /d traffic-dashboard && npm run dev"
-timeout /t 3 /nobreak >nul
-start "" http://localhost:3000
+::start "Dashboard" cmd /k "cd /d traffic-dashboard && npm run dev"
+::timeout /t 3 /nobreak >nul
+::start "" http://localhost:3000
+start "Dashboard" dashboard.html
 
 echo  All services started.
 echo  Dashboard opened in browser.

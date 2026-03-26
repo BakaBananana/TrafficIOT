@@ -190,6 +190,8 @@ class SumoGateway:
         traci.simulationStep()
         step_counter[0] += 1
         self._publish_states(get_state(self.tls_ids), phase_starts, step_counter[0])
+        time.sleep(1)
+        print(step_counter[0])
         return True
 
     def _publish_states(self, state_rows: list, phase_starts: dict, step: int):

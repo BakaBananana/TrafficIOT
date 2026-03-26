@@ -1,223 +1,188 @@
 """
-api_server.py — REST + WebSocket bridge for the dashboard
+api_server.py — REST API for traffic.db
 
-REST endpoints (historical, from SQLite):
-    GET /api/junctions
-    GET /api/state/<jid>?since=<sim_step>&limit=200
-    GET /api/cmds/<jid>?since=<sim_step>&limit=200
-    GET /api/summary
-    GET /api/sim_time        ← current max simulation time seen
-
-WebSocket (live, re-broadcasts MQTT messages):
-    ws://localhost:5050/ws → streams raw JSON state + cmd messages
-
-NOTE: All time values (ts) are SUMO simulation seconds, not wall-clock time.
-      Use the `since` query param to request records after a given simulation
-      second (e.g. ?since=300 for everything after sim-second 300).
-      Use `limit` to cap the number of rows returned (default 200).
+Endpoints:
+  GET /junctions                          — list all junction IDs
+  GET /state/{junction_id}?limit=N        — last N state rows for a junction
+  GET /cmd/{junction_id}?limit=N          — last N cmd rows for a junction
+  GET /moving_average/{junction_id}       — moving avg for pcu_queue / max_wait
+      ?window=30&field=pcu_queue
+  GET /network_summary                    — combined analytics across all junctions
+  GET /live                               — latest single row per junction (for dashboard polling)
 
 Run:
-    pip install flask flask-cors flask-sock paho-mqtt
-    python api_server.py
+  pip install fastapi uvicorn
+  uvicorn api_server:app --reload --port 8000
 """
 
-import json
 import sqlite3
-import threading
+from collections import defaultdict
+from typing import Optional
 
-import paho.mqtt.client as mqtt
-from flask import Flask, jsonify, request
-from flask_cors import CORS
-from flask_sock import Sock
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 
-BROKER_HOST = "localhost"
-BROKER_PORT  = 1883
-DB_FILE      = "traffic.db"
-API_PORT     = 5050
+DB_FILE = "traffic.db"
+app = FastAPI(title="Traffic Analytics API", version="1.0")
 
-app  = Flask(__name__)
-CORS(app)
-sock = Sock(app)
-
-# ── Track the latest simulation time seen over MQTT ───────────────────────
-_sim_time_lock = threading.Lock()
-_latest_sim_ts: float = 0.0   # simulation seconds, updated by MQTT bridge
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
-def _update_sim_ts(ts: float):
-    global _latest_sim_ts
-    with _sim_time_lock:
-        if ts > _latest_sim_ts:
-            _latest_sim_ts = ts
-
-
-def _get_sim_ts() -> float:
-    with _sim_time_lock:
-        return _latest_sim_ts
-
-# ── Live subscriber registry ──────────────────────────────────────────────
-_ws_clients: set = set()
-_ws_lock = threading.Lock()
-
-
-def broadcast(payload: str):
-    with _ws_lock:
-        dead = set()
-        for ws in _ws_clients:
-            try:
-                ws.send(payload)
-            except Exception:
-                dead.add(ws)
-        _ws_clients -= dead
-
-# ── MQTT → WebSocket bridge ───────────────────────────────────────────────
-def start_mqtt_bridge():
-    def on_connect(client, userdata, flags, rc):
-        print(f"[API] MQTT bridge connected (rc={rc})")
-        client.subscribe("traffic/#")
-
-    def on_message(client, userdata, msg):
-        try:
-            payload = json.loads(msg.payload)
-            # Keep track of the latest simulation timestamp
-            if "ts" in payload:
-                _update_sim_ts(float(payload["ts"]))
-            payload["_topic"] = msg.topic
-            broadcast(json.dumps(payload))
-        except Exception:
-            pass
-
-    client = mqtt.Client(client_id="api-bridge")
-    client.on_connect = on_connect
-    client.on_message = on_message
-    client.connect(BROKER_HOST, BROKER_PORT)
-    client.loop_forever()
-
-
-threading.Thread(target=start_mqtt_bridge, daemon=True).start()
-
-# ── WebSocket endpoint ────────────────────────────────────────────────────
-@sock.route("/ws")
-def ws_live(ws):
-    with _ws_lock:
-        _ws_clients.add(ws)
-    try:
-        while True:
-            ws.receive(timeout=30)   # keep-alive
-    except Exception:
-        pass
-    finally:
-        with _ws_lock:
-            _ws_clients.discard(ws)
-
-# ── DB helper ─────────────────────────────────────────────────────────────
-def db():
-    con = sqlite3.connect(DB_FILE)
+def get_con():
+    con = sqlite3.connect(DB_FILE, check_same_thread=False)
     con.row_factory = sqlite3.Row
     return con
 
-# ── REST endpoints ────────────────────────────────────────────────────────
 
-@app.route("/api/sim_time")
-def sim_time():
-    """Return the current maximum simulation timestamp seen (sim seconds)."""
-    con = db()
-    row = con.execute("SELECT MAX(ts) AS max_ts FROM junction_state").fetchone()
-    con.close()
-    db_max = row["max_ts"] if row and row["max_ts"] is not None else 0.0
-    # Also consider what we've seen live over MQTT
-    live_max = _get_sim_ts()
-    return jsonify({"sim_ts": max(db_max, live_max)})
+# ── helpers ──────────────────────────────────────────────────────────────────
+
+def moving_average(values: list[float], window: int) -> list[float]:
+    result = []
+    for i in range(len(values)):
+        start = max(0, i - window + 1)
+        chunk = values[start : i + 1]
+        result.append(sum(chunk) / len(chunk))
+    return result
 
 
-@app.route("/api/junctions")
-def junctions():
-    con = db()
+# ── routes ───────────────────────────────────────────────────────────────────
+
+@app.get("/junctions")
+def list_junctions():
+    con = get_con()
     rows = con.execute(
-        "SELECT DISTINCT junction_id FROM junction_state"
+        "SELECT DISTINCT junction_id FROM junction_state ORDER BY junction_id"
     ).fetchall()
     con.close()
-    return jsonify([r["junction_id"] for r in rows])
+    return {"junctions": [r["junction_id"] for r in rows]}
 
 
-@app.route("/api/state/<jid>")
-def state(jid):
-    """
-    Return junction state rows for <jid>.
-
-    Query params:
-      since  – only rows with ts >= this simulation second (default 0)
-      limit  – max rows to return, newest-last (default 200)
-    """
-    since = float(request.args.get("since", 0))
-    limit = int(request.args.get("limit", 200))
-
-    con = db()
+@app.get("/state/{junction_id}")
+def get_state(junction_id: str, limit: int = Query(300, ge=1, le=5000)):
+    con = get_con()
     rows = con.execute(
-        "SELECT ts, step, pcu_queue, max_wait, current_phase, phase_duration "
-        "FROM junction_state "
-        "WHERE junction_id=? AND ts>=? "
-        "ORDER BY ts "
-        "LIMIT ?",
-        (jid, since, limit)
+        """SELECT ts, step, pcu_queue, max_wait, current_phase, phase_duration
+           FROM junction_state
+           WHERE junction_id = ?
+           ORDER BY ts DESC LIMIT ?""",
+        (junction_id, limit),
     ).fetchall()
     con.close()
-    return jsonify([dict(r) for r in rows])
+    if not rows:
+        raise HTTPException(404, f"No data for junction '{junction_id}'")
+    return {"junction_id": junction_id, "rows": [dict(r) for r in reversed(rows)]}
 
 
-@app.route("/api/cmds/<jid>")
-def cmds(jid):
-    """
-    Return junction command rows for <jid>.
-
-    Query params:
-      since  – only rows with ts >= this simulation second (default 0)
-      limit  – max rows to return (default 200)
-    """
-    since = float(request.args.get("since", 0))
-    limit = int(request.args.get("limit", 200))
-
-    con = db()
+@app.get("/cmd/{junction_id}")
+def get_cmd(junction_id: str, limit: int = Query(300, ge=1, le=5000)):
+    con = get_con()
     rows = con.execute(
-        "SELECT ts, step, action FROM junction_cmd "
-        "WHERE junction_id=? AND ts>=? "
-        "ORDER BY ts "
-        "LIMIT ?",
-        (jid, since, limit)
+        """SELECT ts, step, action
+           FROM junction_cmd
+           WHERE junction_id = ?
+           ORDER BY ts DESC LIMIT ?""",
+        (junction_id, limit),
     ).fetchall()
     con.close()
-    return jsonify([dict(r) for r in rows])
+    return {"junction_id": junction_id, "rows": [dict(r) for r in reversed(rows)]}
 
 
-@app.route("/api/summary")
-def summary():
-    con = db()
-    rows = con.execute("""
-        SELECT s.junction_id,
-               s.ts,
-               s.step,
-               s.pcu_queue,
-               s.max_wait,
-               s.current_phase,
-               COALESCE(c.total_switches, 0) AS total_switches
-        FROM (
-            SELECT junction_id, ts, step, pcu_queue, max_wait, current_phase
+@app.get("/moving_average/{junction_id}")
+def get_moving_average(
+    junction_id: str,
+    window: int = Query(30, ge=2, le=500),
+    field: str = Query("pcu_queue", pattern="^(pcu_queue|max_wait)$"),
+    limit: int = Query(300, ge=10, le=5000),
+):
+    con = get_con()
+    rows = con.execute(
+        f"""SELECT ts, {field}
             FROM junction_state
-            WHERE (junction_id, ts) IN (
-                SELECT junction_id, MAX(ts) FROM junction_state GROUP BY junction_id
-            )
-        ) s
-        LEFT JOIN (
-            SELECT junction_id, SUM(action) AS total_switches
-            FROM junction_cmd GROUP BY junction_id
-        ) c ON s.junction_id = c.junction_id
-    """).fetchall()
+            WHERE junction_id = ?
+            ORDER BY ts DESC LIMIT ?""",
+        (junction_id, limit),
+    ).fetchall()
     con.close()
-    return jsonify([dict(r) for r in rows])
+    if not rows:
+        raise HTTPException(404, f"No data for junction '{junction_id}'")
+    rows = list(reversed(rows))
+    timestamps = [r["ts"] for r in rows]
+    values = [r[field] for r in rows]
+    ma = moving_average(values, window)
+    return {
+        "junction_id": junction_id,
+        "field": field,
+        "window": window,
+        "data": [{"ts": t, "raw": v, "ma": m} for t, v, m in zip(timestamps, values, ma)],
+    }
 
 
-if __name__ == "__main__":
-    print(f"[API] Starting on http://localhost:{API_PORT}")
-    print(f"[API] WebSocket live feed at ws://localhost:{API_PORT}/ws")
-    print(f"[API] All timestamps are SUMO simulation seconds.")
-    app.run(port=API_PORT, debug=False, threaded=True)
+@app.get("/network_summary")
+def network_summary():
+    con = get_con()
+    # Overall averages per junction
+    per_junction = con.execute(
+        """SELECT junction_id,
+                  AVG(pcu_queue)  AS avg_pcu,
+                  AVG(max_wait)   AS avg_wait,
+                  MAX(pcu_queue)  AS peak_pcu,
+                  MAX(max_wait)   AS peak_wait,
+                  COUNT(*)        AS samples
+           FROM junction_state
+           GROUP BY junction_id
+           ORDER BY junction_id"""
+    ).fetchall()
+
+    # Network-wide totals (sum across junctions per timestep → average of those sums)
+    network_rows = con.execute(
+        """SELECT ts,
+                  SUM(pcu_queue) AS total_pcu,
+                  SUM(max_wait)  AS total_wait,
+                  MAX(max_wait)  AS worst_wait
+           FROM junction_state
+           GROUP BY ts
+           ORDER BY ts"""
+    ).fetchall()
+
+    con.close()
+
+    totals = [dict(r) for r in network_rows]
+    avg_total_pcu  = sum(r["total_pcu"]  for r in totals) / len(totals) if totals else 0
+    avg_total_wait = sum(r["total_wait"] for r in totals) / len(totals) if totals else 0
+    peak_total_pcu = max((r["total_pcu"]  for r in totals), default=0)
+    worst_wait_ever = max((r["worst_wait"] for r in totals), default=0)
+
+    return {
+        "per_junction": [dict(r) for r in per_junction],
+        "network": {
+            "avg_total_pcu_queue": round(avg_total_pcu, 3),
+            "avg_total_max_wait":  round(avg_total_wait, 3),
+            "peak_total_pcu_queue": round(peak_total_pcu, 3),
+            "worst_single_junction_wait": round(worst_wait_ever, 3),
+            "timesteps_recorded": len(totals),
+        },
+        "timeseries": totals[-300:],   # last 300 network-wide snapshots
+    }
+
+
+@app.get("/live")
+def live():
+    """Latest row per junction — poll this every second for the dashboard."""
+    con = get_con()
+    rows = con.execute(
+        """SELECT js.*
+           FROM junction_state js
+           INNER JOIN (
+               SELECT junction_id, MAX(ts) AS max_ts
+               FROM junction_state
+               GROUP BY junction_id
+           ) latest ON js.junction_id = latest.junction_id AND js.ts = latest.max_ts
+           ORDER BY js.junction_id"""
+    ).fetchall()
+    con.close()
+    return {"junctions": [dict(r) for r in rows]}
