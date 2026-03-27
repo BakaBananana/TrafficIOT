@@ -82,8 +82,7 @@
   .panel-title { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--sub); }
   .panel-body { padding: 16px; }
 
-  .cw     { position: relative; height: 200px; }
-  .cw-sm  { position: relative; height: 120px; }
+  .cw, .cw-sm { height: 180px; }
   .cw-net { position: relative; height: 180px; }
 
   .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
@@ -187,15 +186,14 @@
           <div class="panel-body"><div class="cw"><canvas id="ma-chart"></canvas></div></div>
         </div>
 
-        <div class="two-col">
-          <div class="panel">
-            <div class="panel-header"><span class="panel-title">PCU Queue — Live</span></div>
-            <div class="panel-body"><div class="cw"><canvas id="pcu-chart"></canvas></div></div>
-          </div>
-          <div class="panel">
-            <div class="panel-header"><span class="panel-title">Max Wait — Live</span></div>
-            <div class="panel-body"><div class="cw"><canvas id="wait-chart"></canvas></div></div>
-          </div>
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">PCU Queue — Live</span></div>
+          <div class="panel-body"><div class="cw"><canvas id="pcu-chart"></canvas></div></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Max Wait — Live</span></div>
+          <div class="panel-body"><div class="cw"><canvas id="wait-chart"></canvas></div></div>
         </div>
 
         <div class="panel">
@@ -247,11 +245,9 @@ const API = "http://localhost:8000";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-// Format Unix-epoch seconds → "HH:MM:SS"
+// TimeStamp - time elapsed since simulation started
 function fmtTs(ts) {
-  const d = new Date(ts * 1000);
-  const p = n => String(n).padStart(2, "0");
-  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  return `${Math.floor(ts)}s`;
 }
 
 // Convert rows to {x: ts (seconds, raw number), y: value}
@@ -278,10 +274,15 @@ function makeOpts({ yLabel = "", yMin, yMax, dualY = false, stepped = false } = 
     scales: {
       x: {
         type: "linear",       // ← plain number axis, no adapter needed
+        title: {
+          display: true,
+          text: "Simulation Time (s)",
+          color: "#4a5568"
+        },
         ticks: {
           maxTicksLimit: 7,
           maxRotation: 0,
-          callback: val => fmtTs(val)   // format each tick as HH:MM:SS
+          callback: val => fmtTs(val)
         },
         grid: { color: "#1a2030" }
       },
@@ -379,16 +380,27 @@ async function loadJunctionCharts() {
     makeOpts({ yLabel: "s" }));
 
   // Stepped phase chart — integer y, stepped: "before"
-  const phOpts = makeOpts({ yLabel: "Phase", yMin: -0.5 });
-  phOpts.scales.y.ticks = { stepSize: 1, precision: 0 };
+  const phOpts = makeOpts({ yLabel: "Phase" });
+  phOpts.scales.y = {
+    min: 0,
+    max: 3,
+    bounds: "ticks",
+    ticks: {
+      stepSize: 1,
+      autoSkip: false,
+      callback: val => val
+    },
+    grid: { color: "#1a2030" }
+  };
   phaseChart = rebuild("phase-chart",
     { datasets: [{ label: "Signal Phase", data: toXY(rows, "current_phase"),
         borderColor: "#c084fc", backgroundColor: "rgba(192,132,252,.15)",
         borderWidth: 2, pointRadius: 0, fill: true,
-        stepped: "before" }] },   // hard vertical jumps between phases
-    phOpts);
-
+        stepped: "before" }] },
+    phOpts
+  );
   fetchMA();
+
 }
 
 // ── Moving average ─────────────────────────────────────────────────────────
