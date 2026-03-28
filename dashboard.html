@@ -5,26 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Traffic Junction Monitor</title>
 
-<!-- Chart.js only — NO date adapter needed -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --bg:      #090c10;
-    --surface: #0f1318;
-    --border:  #1e2530;
-    --accent:  #00e5ff;
-    --accent2: #ff4d6d;
-    --accent3: #b8ff57;
-    --accent4: #c084fc;
-    --muted:   #4a5568;
-    --text:    #e2e8f0;
-    --sub:     #718096;
+    --bg:      #f5f2ee;
+    --surface: #faf8f5;
+    --border:  #ddd8d0;
+    --accent:  #1a6bc4;
+    --accent2: #c0392b;
+    --accent3: #2e7d32;
+    --accent4: #7b1fa2;
+    --muted:   #b0a89c;
+    --text:    #1a1612;
+    --sub:     #7a6f65;
     --radius:  6px;
     --mono:    'Space Mono', monospace;
     --sans:    'Syne', sans-serif;
+    --shadow:  0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
   }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; }
@@ -34,16 +34,17 @@
   header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 12px 24px; border-bottom: 1px solid var(--border); background: var(--surface);
+    box-shadow: var(--shadow);
   }
   header h1 { font-size: 17px; font-weight: 800; letter-spacing: .04em; color: var(--accent); text-transform: uppercase; }
   header h1 span { color: var(--text); }
   #status { font-family: var(--mono); font-size: 11px; color: var(--sub); display: flex; align-items: center; gap: 8px; }
   #dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: background .3s; }
-  #dot.live { background: var(--accent3); box-shadow: 0 0 8px var(--accent3); }
+  #dot.live { background: var(--accent3); box-shadow: 0 0 8px rgba(46,125,50,.4); }
 
   #error-banner {
     display: none; align-items: center; gap: 10px;
-    padding: 10px 24px; background: rgba(255,77,109,.12); border-bottom: 1px solid rgba(255,77,109,.3);
+    padding: 10px 24px; background: rgba(192,57,43,.08); border-bottom: 1px solid rgba(192,57,43,.2);
     font-family: var(--mono); font-size: 12px; color: var(--accent2);
   }
   #error-banner.show { display: flex; }
@@ -51,24 +52,46 @@
 
   main { display: grid; grid-template-columns: 220px 1fr; overflow: hidden; }
 
-  aside { background: var(--surface); border-right: 1px solid var(--border); overflow-y: auto; padding: 12px 0; }
-  .aside-title { font-size: 10px; font-weight: 700; color: var(--sub); letter-spacing: .12em; text-transform: uppercase; padding: 0 16px 8px; }
+  aside {
+    background: var(--surface); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 12px 0;
+  }
+  .aside-title {
+    font-size: 10px; font-weight: 700; color: var(--sub);
+    letter-spacing: .12em; text-transform: uppercase; padding: 0 16px 8px;
+  }
   .junction-btn {
     display: flex; align-items: center; justify-content: space-between;
     width: 100%; padding: 9px 16px; border: none; background: none; cursor: pointer;
     color: var(--sub); font-family: var(--mono); font-size: 12px;
     transition: background .15s, color .15s; text-align: left; gap: 8px;
   }
-  .junction-btn:hover  { background: rgba(0,229,255,.06); color: var(--text); }
-  .junction-btn.active { background: rgba(0,229,255,.10); color: var(--accent); }
-  .junction-btn .badge { font-size: 10px; padding: 1px 6px; border-radius: 99px; background: var(--border); color: var(--sub); font-family: var(--mono); white-space: nowrap; }
-  .junction-btn.active .badge { background: rgba(0,229,255,.15); color: var(--accent); }
+  .junction-btn:hover  { background: rgba(26,107,196,.06); color: var(--text); }
+  .junction-btn.active { background: rgba(26,107,196,.10); color: var(--accent); }
+  .junction-btn .badge {
+    font-size: 10px; padding: 1px 6px; border-radius: 99px;
+    background: var(--border); color: var(--sub); font-family: var(--mono); white-space: nowrap;
+  }
+  .junction-btn.active .badge { background: rgba(26,107,196,.15); color: var(--accent); }
   .aside-divider { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+
+  /* Offline placeholder in sidebar */
+  .aside-offline {
+    padding: 12px 16px;
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    line-height: 1.6;
+  }
+  .aside-offline strong { color: var(--accent2); display: block; margin-bottom: 4px; }
 
   #content { overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 20px; }
 
   .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
-  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+    display: flex; flex-direction: column; gap: 6px;
+    box-shadow: var(--shadow);
+  }
   .stat-label { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--sub); }
   .stat-value { font-family: var(--mono); font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
   .stat-value.c1 { color: var(--accent);  }
@@ -77,8 +100,15 @@
   .stat-value.c4 { color: var(--accent4); }
   .stat-sub { font-family: var(--mono); font-size: 11px; color: var(--sub); }
 
-  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-  .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 8px; }
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+  }
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 8px;
+    background: var(--bg);
+  }
   .panel-title { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--sub); }
   .panel-body { padding: 16px; }
 
@@ -98,9 +128,14 @@
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
   .net-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 10px; }
-  .net-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; transition: border-color .2s, background .2s; }
-  .net-card:hover { border-color: var(--accent); background: rgba(0,229,255,.04); }
-  .net-card.sel   { border-color: var(--accent); background: rgba(0,229,255,.07); }
+  .net-card {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px;
+    display: flex; flex-direction: column; gap: 4px;
+    cursor: pointer; transition: border-color .2s, background .2s;
+  }
+  .net-card:hover { border-color: var(--accent); background: rgba(26,107,196,.04); }
+  .net-card.sel   { border-color: var(--accent); background: rgba(26,107,196,.07); }
   .net-card .nc-id  { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--accent); }
   .net-card .nc-row { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; }
   .nc-k { color: var(--sub); }
@@ -127,7 +162,7 @@
   </header>
 
   <div id="error-banner">
-    ⚠ Cannot reach API at <code>http://localhost:8000</code> — run:
+    ⚠ Cannot reach API at <code id="api-url-display">http://localhost:8000</code> — run:
     <code>uvicorn api_server:app --port 8000</code>
     <a onclick="this.parentElement.classList.remove('show')">dismiss</a>
   </div>
@@ -135,7 +170,14 @@
   <main>
     <aside>
       <div class="aside-title">Junctions</div>
-      <div id="junction-list"></div>
+      <div id="junction-list">
+        <!-- Populated by JS; shows offline notice if API unreachable -->
+        <div class="aside-offline" id="aside-offline" style="display:none;">
+          <strong>API offline</strong>
+          Start the server:<br>
+          <code>uvicorn api_server:app<br>--port 8000</code>
+        </div>
+      </div>
       <hr class="aside-divider" />
       <button class="junction-btn" id="btn-network" onclick="selectView('network')">
         <span>🌐 Network Overview</span>
@@ -236,60 +278,65 @@
         </div>
       </div>
 
+      <!-- EMPTY / OFFLINE STATE -->
+      <div id="view-empty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;height:100%;color:var(--sub);font-family:var(--mono);font-size:13px;text-align:center;">
+        <div style="font-size:32px;">🚦</div>
+        <div>
+          <strong style="color:var(--accent2);display:block;margin-bottom:6px;">API not reachable</strong>
+          Start your server, then the junction list will populate automatically.
+        </div>
+        <code style="background:var(--border);padding:6px 12px;border-radius:4px;font-size:11px;">
+          uvicorn api_server:app --reload --port 8000
+        </code>
+        <button onclick="init()" style="margin-top:8px;padding:7px 18px;border:1px solid var(--accent);background:rgba(26,107,196,.08);color:var(--accent);border-radius:4px;font-family:var(--mono);font-size:12px;cursor:pointer;">
+          Retry connection
+        </button>
+      </div>
+
     </div>
   </main>
 </div>
 
 <script>
+// ── Config ─────────────────────────────────────────────────────────────────
+// Change this to your actual server URL if needed.
+// Use a relative URL (empty string) if the HTML is served by the same server.
+// Keeping it as http://localhost:8000 is fine for development —
+// the "Unsafe attempt to load URL" warning only appears when opening the
+// HTML as a file:// URL. Serve it via: python -m http.server 3000
+// or let uvicorn/FastAPI serve the static file.
 const API = "http://localhost:8000";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-
-// TimeStamp - time elapsed since simulation started
-function fmtTs(ts) {
-  return `${Math.floor(ts)}s`;
-}
-
-// Convert rows to {x: ts (seconds, raw number), y: value}
-// We keep x as a plain number (epoch seconds) and use a linear scale.
-// Tick labels are formatted with fmtTs().
+function fmtTs(ts) { return `${Math.floor(ts)}s`; }
 const toXY = (rows, key) => rows.map(r => ({ x: r.ts, y: r[key] }));
 
-// ── Chart options factory (linear x = ts in epoch-seconds) ────────────────
-function makeOpts({ yLabel = "", yMin, yMax, dualY = false, stepped = false } = {}) {
+// ── Chart options factory ──────────────────────────────────────────────────
+function makeOpts({ yLabel = "", yMin, yMax, dualY = false } = {}) {
+  // Off-white theme grid & tick colours
+  const gridCol  = "#ddd8d0";
+  const labelCol = "#7a6f65";
   return {
     responsive: true,
     maintainAspectRatio: false,
     animation: false,
     interaction: { mode: "index", intersect: false },
     plugins: {
-      legend: { display: true, labels: { boxWidth: 10, padding: 12, color: "#718096" } },
-      tooltip: {
-        callbacks: {
-          // Show the x-value as a clock time in the tooltip title
-          title: items => fmtTs(items[0].parsed.x)
-        }
-      }
+      legend: { display: true, labels: { boxWidth: 10, padding: 12, color: labelCol } },
+      tooltip: { callbacks: { title: items => fmtTs(items[0].parsed.x) } }
     },
     scales: {
       x: {
-        type: "linear",       // ← plain number axis, no adapter needed
-        title: {
-          display: true,
-          text: "Simulation Time (s)",
-          color: "#4a5568"
-        },
-        ticks: {
-          maxTicksLimit: 7,
-          maxRotation: 0,
-          callback: val => fmtTs(val)
-        },
-        grid: { color: "#1a2030" }
+        type: "linear",
+        title: { display: true, text: "Simulation Time (s)", color: labelCol },
+        ticks: { maxTicksLimit: 7, maxRotation: 0, callback: val => fmtTs(val), color: labelCol },
+        grid: { color: gridCol }
       },
       y: {
         beginAtZero: true,
-        title: { display: !!yLabel, text: yLabel, color: "#4a5568" },
-        grid: { color: "#1a2030" },
+        title: { display: !!yLabel, text: yLabel, color: labelCol },
+        ticks: { color: labelCol },
+        grid: { color: gridCol },
         ...(yMin !== undefined ? { min: yMin } : {}),
         ...(yMax !== undefined ? { max: yMax } : {})
       },
@@ -297,7 +344,8 @@ function makeOpts({ yLabel = "", yMin, yMax, dualY = false, stepped = false } = 
         y1: {
           position: "right", beginAtZero: true,
           grid: { drawOnChartArea: false },
-          title: { display: true, text: "Wait (s)", color: "#4a5568" }
+          title: { display: true, text: "Wait (s)", color: labelCol },
+          ticks: { color: labelCol }
         }
       } : {})
     }
@@ -305,8 +353,6 @@ function makeOpts({ yLabel = "", yMin, yMax, dualY = false, stepped = false } = 
 }
 
 // ── Safe chart rebuild ─────────────────────────────────────────────────────
-// Uses Chart.getChart() so it always finds the live instance even if the JS
-// variable went stale — prevents "canvas already in use" errors.
 function rebuild(canvasId, data, opts) {
   const existing = Chart.getChart(canvasId);
   if (existing) existing.destroy();
@@ -323,8 +369,17 @@ let maTimer = null, liveData = {};
 
 // ── Init ───────────────────────────────────────────────────────────────────
 async function init() {
+  document.getElementById("view-empty").style.display = "none";
   const data = await apiFetch(`${API}/junctions`);
-  if (!data) return;
+  if (!data) {
+    // API not reachable — show offline placeholder in sidebar and empty state
+    document.getElementById("aside-offline").style.display = "block";
+    document.getElementById("view-empty").style.display = "flex";
+    document.getElementById("view-junction").style.display = "none";
+    document.getElementById("view-network").style.display  = "none";
+    return;
+  }
+  document.getElementById("aside-offline").style.display = "none";
   junctions = data.junctions;
   renderSidebar();
   if (junctions.length) selectView("junction", junctions[0]);
@@ -332,16 +387,26 @@ async function init() {
 }
 
 function renderSidebar() {
-  document.getElementById("junction-list").innerHTML = junctions.map(j =>
-    `<button class="junction-btn" id="btn-${j}" onclick="selectView('junction','${j}')">
-       <span>${j}</span><span class="badge" id="badge-${j}">—</span>
-     </button>`
-  ).join("");
+  const list = document.getElementById("junction-list");
+  // Clear only the dynamic buttons (not the offline notice)
+  const offline = document.getElementById("aside-offline");
+  list.innerHTML = "";
+  list.appendChild(offline);
+
+  junctions.forEach(j => {
+    const btn = document.createElement("button");
+    btn.className = "junction-btn";
+    btn.id = `btn-${j}`;
+    btn.innerHTML = `<span>${j}</span><span class="badge" id="badge-${j}">—</span>`;
+    btn.addEventListener("click", () => selectView("junction", j));
+    list.appendChild(btn);
+  });
 }
 
 // ── View switching ─────────────────────────────────────────────────────────
 function selectView(type, jid) {
   document.querySelectorAll(".junction-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById("view-empty").style.display = "none";
   if (type === "network") {
     view = "network";
     document.getElementById("btn-network").classList.add("active");
@@ -367,40 +432,39 @@ async function loadJunctionCharts() {
   if (!res) return;
   const rows = res.rows;
 
+  // Compute avg for stat-sub
+  if (rows.length) {
+    const avgPcu  = rows.reduce((s, r) => s + r.pcu_queue, 0) / rows.length;
+    const avgWait = rows.reduce((s, r) => s + r.max_wait, 0) / rows.length;
+    document.getElementById("s-pcu-avg").textContent  = `avg ${avgPcu.toFixed(2)}`;
+    document.getElementById("s-wait-avg").textContent = `avg ${avgWait.toFixed(2)}s`;
+  }
+
   pcuChart = rebuild("pcu-chart",
     { datasets: [{ label: "PCU Queue", data: toXY(rows, "pcu_queue"),
-        borderColor: "#00e5ff", backgroundColor: "rgba(0,229,255,.07)",
+        borderColor: "#1a6bc4", backgroundColor: "rgba(26,107,196,.08)",
         borderWidth: 1.5, pointRadius: 0, fill: true, tension: .3 }] },
     makeOpts({ yLabel: "PCU" }));
 
   waitChart = rebuild("wait-chart",
     { datasets: [{ label: "Max Wait", data: toXY(rows, "max_wait"),
-        borderColor: "#ff4d6d", backgroundColor: "rgba(255,77,109,.07)",
+        borderColor: "#c0392b", backgroundColor: "rgba(192,57,43,.08)",
         borderWidth: 1.5, pointRadius: 0, fill: true, tension: .3 }] },
     makeOpts({ yLabel: "s" }));
 
-  // Stepped phase chart — integer y, stepped: "before"
   const phOpts = makeOpts({ yLabel: "Phase" });
   phOpts.scales.y = {
-    min: 0,
-    max: 3,
-    bounds: "ticks",
-    ticks: {
-      stepSize: 1,
-      autoSkip: false,
-      callback: val => val
-    },
-    grid: { color: "#1a2030" }
+    min: 0, max: 3, bounds: "ticks",
+    ticks: { stepSize: 1, autoSkip: false, callback: val => val, color: "#7a6f65" },
+    grid: { color: "#ddd8d0" }
   };
   phaseChart = rebuild("phase-chart",
     { datasets: [{ label: "Signal Phase", data: toXY(rows, "current_phase"),
-        borderColor: "#c084fc", backgroundColor: "rgba(192,132,252,.15)",
-        borderWidth: 2, pointRadius: 0, fill: true,
-        stepped: "before" }] },
+        borderColor: "#7b1fa2", backgroundColor: "rgba(123,31,162,.12)",
+        borderWidth: 2, pointRadius: 0, fill: true, stepped: "before" }] },
     phOpts
   );
   fetchMA();
-
 }
 
 // ── Moving average ─────────────────────────────────────────────────────────
@@ -413,12 +477,12 @@ async function fetchMA() {
     `${API}/moving_average/${selectedJunction}?field=${field}&window=${win}&limit=300`);
   if (!res) return;
 
-  const col = field === "pcu_queue" ? "#00e5ff" : "#ff4d6d";
+  const col = field === "pcu_queue" ? "#1a6bc4" : "#c0392b";
   maChart = rebuild("ma-chart",
     { datasets: [
         { label: "Raw",
           data: res.data.map(d => ({ x: d.ts, y: d.raw })),
-          borderColor: "rgba(255,255,255,.18)", borderWidth: 1, pointRadius: 0, tension: .3 },
+          borderColor: "rgba(0,0,0,.15)", borderWidth: 1, pointRadius: 0, tension: .3 },
         { label: `MA(${win})`,
           data: res.data.map(d => ({ x: d.ts, y: d.ma })),
           borderColor: col, borderWidth: 2.5, pointRadius: 0, tension: .4 }
@@ -445,17 +509,17 @@ async function loadNetworkView() {
 
   const ts = res.timeseries;
   const nopts = makeOpts({ dualY: true });
-  nopts.scales.y.title  = { display: true, text: "Total PCU",      color: "#4a5568" };
-  nopts.scales.y1.title = { display: true, text: "Worst Wait (s)", color: "#4a5568" };
+  nopts.scales.y.title  = { display: true, text: "Total PCU",      color: "#7a6f65" };
+  nopts.scales.y1.title = { display: true, text: "Worst Wait (s)", color: "#7a6f65" };
 
   netChart = rebuild("net-chart",
     { datasets: [
         { label: "Total PCU",
           data: ts.map(r => ({ x: r.ts, y: r.total_pcu })),
-          borderColor: "#00e5ff", borderWidth: 1.5, pointRadius: 0, fill: false, tension: .3, yAxisID: "y" },
+          borderColor: "#1a6bc4", borderWidth: 1.5, pointRadius: 0, fill: false, tension: .3, yAxisID: "y" },
         { label: "Worst Wait",
           data: ts.map(r => ({ x: r.ts, y: r.worst_wait })),
-          borderColor: "#ff4d6d", borderWidth: 1.5, pointRadius: 0, fill: false, tension: .3, yAxisID: "y1" }
+          borderColor: "#c0392b", borderWidth: 1.5, pointRadius: 0, fill: false, tension: .3, yAxisID: "y1" }
       ] },
     nopts);
 
@@ -476,6 +540,9 @@ async function loadNetworkView() {
 async function pollLive() {
   const res = await apiFetch(`${API}/live`);
   if (!res) return;
+
+  // If we were in the offline state, re-init to populate junctions
+  if (junctions.length === 0) { await init(); return; }
 
   setStatus(true, `Live · ${new Date().toLocaleTimeString()}`);
   res.junctions.forEach(j => {
@@ -506,7 +573,6 @@ async function pollLive() {
   }
 }
 
-// Append a single {x,y} point to dataset 0, capped at maxPts
 function pushPt(chart, x, y, maxPts) {
   if (!chart) return;
   const ds = chart.data.datasets[0];
@@ -515,7 +581,7 @@ function pushPt(chart, x, y, maxPts) {
   chart.update("none");
 }
 
-// ── API fetch — shows error banner on failure ──────────────────────────────
+// ── API fetch ──────────────────────────────────────────────────────────────
 async function apiFetch(url) {
   try {
     const r = await fetch(url);
@@ -531,7 +597,7 @@ async function apiFetch(url) {
 }
 
 function setStatus(ok, msg) {
-  document.getElementById("dot").className          = ok ? "live" : "";
+  document.getElementById("dot").className           = ok ? "live" : "";
   document.getElementById("status-text").textContent = msg;
 }
 

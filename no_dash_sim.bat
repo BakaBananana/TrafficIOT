@@ -17,6 +17,10 @@ echo.
 start "MQTT Broker" cmd /k "%MOSQUITTO%"
 timeout /t 2 /nobreak >nul
 
+:: T2 — DB Logger (must start before gateway so no messages are missed)
+start "DB Logger" cmd /k "%PYTHON% logger.py"
+timeout /t 1 /nobreak >nul
+
 :: T3 — Decision Model
 start "Decision Model" cmd /k "%PYTHON% stgat_model_client.py --model %MODEL_PTH%"
 timeout /t 1 /nobreak >nul
