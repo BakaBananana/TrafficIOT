@@ -90,7 +90,7 @@ traffic-dashboard/
 
 ---
 
-## 👥 Authors & Team
+## 👥 Team
 Developed collaboratively by:
 - **Divya Prakash Sinha**
 - **Dyuti Ballav Paul**
