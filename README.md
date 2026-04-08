@@ -4,7 +4,7 @@
 
 A production-ready Deep Reinforcement Learning infrastructure for adaptive, multi-intersection traffic signal control using **Spatial-Temporal Graph Attention Networks (STGAT)** and **Proximal Policy Optimization (PPO)**. 
 
-Designed natively for a **Fog Computing** & IoT architecture, this project seamlessly bridges highly-scalable academic deep learning with a real-world edge telemetry stack (MQTT, InfluxDB, FastAPI) and multiple digital twin interfaces (Eclipse SUMO, Unity 3D, and React).
+This project seamlessly bridges highly-scalable academic deep learning with a real-world edge telemetry stack (MQTT, InfluxDB, FastAPI) and multiple digital twin interfaces (Eclipse SUMO, Unity 3D, and React).
 
 ---
 
