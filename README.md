@@ -1,8 +1,5 @@
 # 🚦 Smart Traffic Control System (STC)
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
-![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-EE4C2C.svg)
-![React](https://img.shields.io/badge/React-Vite-61DAFB.svg)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 A production-ready Deep Reinforcement Learning infrastructure for adaptive, multi-intersection traffic signal control using **Spatial-Temporal Graph Attention Networks (STGAT)** and **Proximal Policy Optimization (PPO)**. 
