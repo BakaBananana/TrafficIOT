@@ -22,11 +22,15 @@ The system operates across three distinct layers:
 3. **Client/Visualization Layer:** A dedicated React frontend tracking real-time reward outputs, cumulative wait-time reductions, and queue pressure charts.
 
 ## 🛠️ Technology Stack
-- **Simulation**: Eclipse SUMO (libsumo / TraCI)
-- **AI / Model**: PyTorch, Gym/PettingZoo paradigms
-- **Microservices Data Backbone**: FastAPI (Uvicorn), Eclipse Mosquitto (MQTT), InfluxDB 
-- **Frontend & Visualization**: Node.js, React (Vite.js), Recharts
-- **Spatial Rendering**: Unity 3D Engine
+
+| Domain | Technologies |
+| :--- | :--- |
+| **Simulation** | ![SUMO](https://img.shields.io/badge/Eclipse_SUMO-006F8C?style=flat&logo=eclipse&logoColor=white) ![TraCI](https://img.shields.io/badge/TraCI_API-263A48?style=flat) |
+| **AI / Model** | ![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=flat&logo=pytorch&logoColor=white) ![Custom RL Environment](https://img.shields.io/badge/Custom_RL_Environment-000000?style=flat) |
+| **Microservices & Data** | ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white) ![Mosquitto MQTT](https://img.shields.io/badge/MQTT_Mosquitto-3C5280?style=flat&logo=eclipse-mosquitto&logoColor=white) ![InfluxDB](https://img.shields.io/badge/InfluxDB-22ADF6?style=flat&logo=influxdb&logoColor=white) ![Docker](https://img.shields.io/badge/Docker_Compose-2496ED?style=flat&logo=docker&logoColor=white) |
+| **Frontend Dashboard** | ![NodeJS](https://img.shields.io/badge/Node.js-339933?style=flat&logo=nodedotjs&logoColor=white) ![React](https://img.shields.io/badge/React-61DAFB?style=flat&logo=react&logoColor=black) |
+| **Spatial Rendering** | ![Unity](https://img.shields.io/badge/Unity_3D-000000?style=flat&logo=unity&logoColor=white) |
+
 
 ## 📂 Repository Structure
 ```text
